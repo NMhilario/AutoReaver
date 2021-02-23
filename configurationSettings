@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#####################################################
+############ AUTO-REAVER CONFIGURATION ##############
+#####################################################
+
+###### APLICATION PATHS ######
+REAVER_DIR=$(pwd);
+REAVER_SESSION_DIR="$REAVER_DIR/SESSION"
+REAVER_TMP_DIR="$REAVER_DIR/TMP"
+REAVER_CRACKED_DIR="$REAVER_DIR/CRACKED"
+PATH_IEEE="/sys/class/ieee80211/";
+PATH_DRIVER="/device/driver/module/drivers/";
+PATH_DEVICE="/device/net/";
+
+###### AIRMON-NG ######
+AIRMON_CHECK_KILL=0;
+
+###### REAVER ADDITIONAL OPTIONS ######
+ADDITIONAL_OPTIONS="-E -S -N -T 1 -t 15 --win7";

