@@ -30,6 +30,9 @@ CMD_REAVER="";
 REAVER_GET_KEY=0;
 WIFI_CARD_RNDMAC="";
 BSSID_LIMIT_FILE="";
+###### APPLICATION REQUISITES ######
+COMMAND="reaver macchanger airmon-ng aireplay-ng konsole"
+HTTP_CONN="https://www.google.com/"
 ###### AIREPLAY-NG ######
 FAKE_AUTH_DELAY_SECONDS=60;
 ###### REAVER OPTIONS ######
@@ -38,4 +41,4 @@ REAVER_ATTEMPT_DELAY=0;
 ADDITIONAL_OPTIONS_YN="Yes";
 ADDITIONAL_OPTIONS="-E -S -N -T 1 -t 15 --win7";
 ###### WASH SCAN TIME ######
-WASH_TIME=5;
+WASH_TIME=25;
