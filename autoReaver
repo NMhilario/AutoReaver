@@ -25,6 +25,8 @@
 ###### DBus Server launch ERROR issue, please visit https://www.kali.org/docs/general-use/xfce-with-rdp/
 ###################################################################################################################################################
 
+clear;
+
 if [ "$EUID" -ne 0 ]; then
 	echo "Please rua as root!!!";
 	exit;
@@ -249,7 +251,7 @@ setReaverOpt(){
 
                 case $YN in
                         [Yy]* )
-				ADDITIONAL_OPTIONS_YN="Yes"
+				ADDITIONAL_OPTIONS_YN="Yes";
                                 break;;
                         [Nn]* )
 				ADDITIONAL_OPTIONS_YN="No";
@@ -354,24 +356,72 @@ checkIEEEPaths(){
 }
 
 checkRequisites(){
-	local WEB=0;
+	local i;
+	local CMD_COMMAND;
+	local MISSING;
 	local YN;
-	declare -a ARR_COMMAND=$COMMAND;
+	declare -a ARR_REQUISITES="$REQUISITES";
+	declare -a MISS_REQUISITES;
 
-	echoBlue "Checking if AutoReaver Prerequisites are Present......";
+	echoBlue "Checking if AutoReaver Requisites are Present......";
 
-	case "$(curl -s --max-time 2 -I $HTTP_CONN | sed 's/^[^ ]*  *\([0-9]\).*/\1/; 1q')" in
-		[23]* )
-			echoWhite "HTTP Connectivity is up......"
-			WEB=1
+	for (( i=0; i<${#ARR_REQUISITES[@]}; i++ )); do
+		CMD_COMMAND=$(command -v "${ARR_REQUISITES[$i]}");
 
-			read -p "" YN
-			;;
-		[5]* )
-			echoRed "The Web Proxy Won't Let us Through......";;
-		* )
-			echoBlue "The Network is Down or Very Slow......";;
-	esac
+		if [ -z "$CMD_COMMAND" ]; then
+			MISS_REQUISITES[${#MISS_REQUISITES[@]}]="${ARR_REQUISITES[$i]}";
+		fi
+	done
+
+	if [ ${#MISS_REQUISITES[@]} -gt 0 ]; then
+		MISSING="${MISS_REQUISITES[@]}";
+		echoRed "Following Requisites, $MISSING, are Missing......";
+
+		while true; do
+			read -p "Do You Want to Try to Install Missing Requisites (Y/N)? " YN;
+
+			case $YN in
+				[Yy]* )
+					case "$(curl -s --max-time 2 -I $HTTP_CONN | sed 's/^[^ ]*  *\([0-9]\).*/\1/; 1q')" in
+						[23]* )
+							echoBlue "HTTP Connectivity is up......";
+
+							for (( i=0; i<${#MISS_REQUISITES[@]}; i++ )); do
+								echoBlue "Installing ${MISS_REQUISITES[$i]}......"
+
+								CMD_COMMAND="sudo apt-get install ${MISS_REQUISITES[$i]} -y";
+								eval $CMD_COMMAND;
+
+								if [[ $? > 0 ]]; then
+									echoRed "${MISS_REQUISITES[$i]} Failed to Install, Exiting......";
+									exitAutoReaver;
+								else
+									echoBlue "${MISS_REQUISITES[$i]} Installed Successfuly......";
+									sleep 3 && clear;
+								fi
+							done;;
+						[5]* )
+							echoRed "The Web Proxy Won't Let us Through......";
+							echoBlue "Exiting......";
+							exitAutoReaver;;
+						* )
+							echoRed "The Network is Down or Very Slow......";
+							echoBlue "Exiting......";
+							exitAutoReaver;;
+					esac
+
+					break;;
+				[Nn]* )
+					echoBlue "Exiting......";
+					exitAutoReaver;
+					break;;
+				* )
+			esac
+		done
+	else
+		echoBlue "All Requisites are Installed......";
+		sleep 3;
+	fi
 }
 
 exitAutoReaver(){
@@ -389,14 +439,12 @@ exitAutoReaver(){
 		systemctl restart NetworkManager;
 	fi
 
-	exit;
+	exit 0;
 }
 
 ###########################################################################################################################
 ###################################################### END FUNCTIONS ######################################################
 ###########################################################################################################################
-
-clear;
 
 SCRIPT_INIT=1;
 
@@ -420,7 +468,8 @@ if [[ ! -d "$REAVER_CRACKED_DIR" ]]; then
 fi
 
 checkRequisites;
-exit;
+
+clear;
 
 while true; do
 	PROCEED=0;

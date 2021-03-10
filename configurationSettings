@@ -31,7 +31,7 @@ REAVER_GET_KEY=0;
 WIFI_CARD_RNDMAC="";
 BSSID_LIMIT_FILE="";
 ###### APPLICATION REQUISITES ######
-COMMAND="reaver macchanger airmon-ng aireplay-ng konsole"
+REQUISITES='("reaver" "macchanger" "airmon-ng" "aireplay-ng" "konsole")'
 HTTP_CONN="https://www.google.com/"
 ###### AIREPLAY-NG ######
 FAKE_AUTH_DELAY_SECONDS=60;
