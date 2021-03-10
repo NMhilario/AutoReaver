@@ -425,6 +425,8 @@ checkRequisites(){
 }
 
 exitAutoReaver(){
+	local netManagerStatus;
+
         if [ ! -z "$WIFI_CARD_MONITOR" ]; then
                 stopMonitor;
         fi
