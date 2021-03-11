@@ -4,7 +4,7 @@
 ############ AUTO-REAVER CONFIGURATION ##############
 #####################################################
 
-###### APLICATION PATHS ######
+###### APLICATION PATHS/FILES ######
 REAVER_DIR=$(pwd);
 REAVER_SESSION_DIR="$REAVER_DIR/SESSION"
 REAVER_TMP_DIR="$REAVER_DIR/TMP"
@@ -12,6 +12,8 @@ REAVER_CRACKED_DIR="$REAVER_DIR/CRACKED"
 PATH_IEEE="/sys/class/ieee80211/";
 PATH_DRIVER="/device/driver/module/drivers/";
 PATH_DEVICE="/device/net/";
+CHECK_ACTIVITY_FILE="$REAVER_TMP_DIR/lastActivity";
+CRACKED_LIST_FILE="$REAVER_CRACKED_DIR/crackedList";
 ###### APLICATION GLOBAL VARIABLES ######
 WIFI_CARD_DRIVER="";
 WIFI_CARD_LOGICAL="";
@@ -24,12 +26,16 @@ AP_ESSID="";
 AP_WPS="";
 AP_LOCK="";
 PROCEED=0;
-SESSION_FILE="";
 CMD_FAUTH="";
 CMD_REAVER="";
 REAVER_GET_KEY=0;
 WIFI_CARD_RNDMAC="";
+SESSION_FILE="";
 BSSID_LIMIT_FILE="";
+REAVER_ACTIVITY_PERL_REGEXP="Received M3";
+REAVER_CHECKED_PIN_PERL_REGEXP="Received WSC NACK";
+BSSID_CLEAR="";
+BSSID_LAST_PIN_DATE_FILE="";
 ###### APPLICATION REQUISITES ######
 REQUISITES='("reaver" "macchanger" "airmon-ng" "aireplay-ng" "konsole" "perl")'
 HTTP_CONN="https://www.google.com/"
@@ -41,4 +47,4 @@ REAVER_ATTEMPT_DELAY=0;
 ADDITIONAL_OPTIONS_YN="Yes";
 ADDITIONAL_OPTIONS="-E -S -N -T 1 -t 15 --win7";
 ###### WASH SCAN TIME ######
-WASH_TIME=25;
+WASH_TIME=5;

