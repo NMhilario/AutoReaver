@@ -27,12 +27,13 @@ AP_LOCK="";
 PROCEED=0;
 CMD_FAUTH="";
 CMD_REAVER="";
-REAVER_GET_KEY=0;
+GET_RATE_LIMITING=0;
+GET_WPS_PIN=0;
 WIFI_CARD_RNDMAC="";
 SESSION_FILE="";
 BSSID_CLEAR="";
 ###### APPLICATION REQUISITES ######
-REQUISITES='("reaver" "macchanger" "airmon-ng" "aireplay-ng" "konsole" "perl")'
+REQUISITES='("reaver" "macchanger" "airmon-ng" "aireplay-ng" "konsole" "wash")'
 HTTP_CONN="https://www.google.com/"
 ###### AIREPLAY-NG ######
 FAKE_AUTH_DELAY_SECONDS=60;
@@ -42,4 +43,4 @@ REAVER_ATTEMPT_DELAY=0;
 ADDITIONAL_OPTIONS_YN="Yes";
 ADDITIONAL_OPTIONS="-E -S -N -T 1 -t 15 --win7";
 ###### WASH SCAN TIME ######
-WASH_TIME=5;
+WASH_TIME=20;

