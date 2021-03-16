@@ -6,9 +6,9 @@
 
 ###### APLICATION PATHS/FILES ######
 REAVER_DIR=$(pwd);
-REAVER_SESSION_DIR="$REAVER_DIR/SESSION"
-REAVER_TMP_DIR="$REAVER_DIR/TMP"
-REAVER_CRACKED_DIR="$REAVER_DIR/CRACKED"
+REAVER_SESSION_DIR="$REAVER_DIR/SESSION";
+REAVER_TMP_DIR="$REAVER_DIR/TMP";
+REAVER_CRACKED_DIR="$REAVER_DIR/CRACKED";
 PATH_IEEE="/sys/class/ieee80211/";
 PATH_DRIVER="/device/driver/module/drivers/";
 PATH_DEVICE="/device/net/";
@@ -30,11 +30,12 @@ WIFI_CARD_RNDMAC="";
 SESSION_FILE="";
 BSSID_CLEAR="";
 ###### APPLICATION REQUISITES ######
-REQUISITES='("reaver" "macchanger" "airmon-ng" "aireplay-ng" "konsole" "wash")'
-HTTP_CONN="https://www.google.com/"
+REQUISITES='("reaver" "macchanger" "airmon-ng" "aireplay-ng" "konsole" "wash")';
+HTTP_CONN="https://www.google.com/";
 ###### AIREPLAY-NG ######
 FAKE_AUTH_DELAY_SECONDS=60;
 ###### REAVER OPTIONS ######
+REAVER_ARGS='("-i " "-b " "-m " "-e " "-c " "-s " "-C " "-f " "-5 none" "-vv none" "-q none" "-p " "-d " "-l " "-g " "-x " "-r " "-t " "-T " "-A none" "-N none" "-S none" "-L none" "-E none" "-J none" "-F none" "-w none" "-K none" "-Z none" "-O ")';
 REAVER_PIN_ATTEMPTS=3;
 REAVER_ATTEMPT_DELAY=0;
 ADDITIONAL_OPTIONS_YN="Yes";

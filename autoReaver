@@ -230,7 +230,7 @@ setAPSettings(){
 	unset AP_LIST;
 }
 
-setReaverOpt(){
+setAutoReaverOpt(){
 	local YN;
 	local SEC
 	local ATTEMPT;
@@ -313,6 +313,15 @@ setReaverOpt(){
                         * )
                 esac
         done
+}
+
+reaverConfig(){
+	unset option ARR_REAVER_OPT;
+	declare ARR_REAVER_OPT;
+
+
+
+	unset ARR_REAVER_OPT;
 }
 
 getRandomMac(){
@@ -545,7 +554,7 @@ while true; do
 
 	echoWhite "AutoReaver Settings......";
 	echo "";
-	setReaverOpt;
+	setAutoReaverOpt;
 	clear;
 
 	echoWhite "Device Settings --------------------------------------------------------------------";
