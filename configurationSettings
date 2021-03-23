@@ -32,7 +32,7 @@ STATUS_FILE="";
 BSSID_CLEAR="";
 WPS_PIN="";
 WPA_PSK="";
-LCK_ATTEMPT=0;
+STATUS_LINE="";
 ###### APPLICATION REQUISITES ######
 REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash")';
 HTTP_CONN="https://www.google.com/";

