@@ -33,8 +33,10 @@ BSSID_CLEAR="";
 WPS_PIN="";
 WPA_PSK="";
 STATUS_LINE="";
+REAVER_OUTPUT="";
+LCK_ATTEMPT="";
 ###### APPLICATION REQUISITES ######
-REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash")';
+REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash" "gawk" "curl" "sed")';
 HTTP_CONN="https://www.google.com/";
 ###### AIREPLAY-NG ######
 FAKE_AUTH_DELAY_SECONDS=60;

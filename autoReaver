@@ -126,6 +126,7 @@ setAPSettings(){
 	local APCHOICE;
 	local YN;
 	local nTIME;
+	local CMD_WASH;
 
 	while true; do
 		read -p "AP Scan Time Set to $WASH_TIME Sec., Change (Y/N)? " YN;
@@ -154,7 +155,7 @@ setAPSettings(){
 	echoBlue "Please Wait...";
 	echo "";
 
-	local CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
+	CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
 	eval $CMD_WASH >>/dev/null;
 
 	unset option AP_LIST ERROR;
@@ -673,14 +674,14 @@ while true; do
 		LCK_ATTEMPT=$((LCK_ATTEMPT+1));
 		echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT $AP_LOCK AP_RATE_LIMITING") >> $STATUS_FILE;
 
-		if [[ "$AP_LOCK" -eq "Yes" ]]; then
+		if [[ "$AP_LOCK" == "Yes" ]]; then
 			echoRed "AP Locked......";
 			break;
 			### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP IN THE FUTURE ###
 		else
 			### checkLockStatus;
 
-			if [[ "$AP_LOCK" -eq "Yes" ]]; then
+			if [[ "$AP_LOCK" == "Yes" ]]; then
 				echoRed "AP Locked......";
 				break;
 				### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP IN THE FUTURE ###
