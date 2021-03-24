@@ -360,7 +360,6 @@ checkAPLockStatus(){
 	if [[ ! -f $STATUS_FILE ]]; then
 		touch $STATUS_FILE;
 		ehoGreen "Status File for $AP_BSSID Created......";
-		echo $(date +"- - - - BOF") > $STATUS_FILE
 	else
 		choBlue "Status File for $AP_BSSID Found......";
 	fi
@@ -389,7 +388,6 @@ checkAPLockStatus(){
 
 		$(killall -I wash);
 	}
-
 }
 
 getRandomMac(){
@@ -682,14 +680,13 @@ STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
 
 if [[ ! -f $STATUS_FILE ]]; then
 	touch $STATUS_FILE;
-	echo $(date +"- - - - BOF") > $STATUS_FILE
 	echoGreen "Status File for $AP_BSSID Created......";
 else
 	echoBlue "Status File for $AP_BSSID Found......";
 fi
 
 if [[ ! -f $CRACKED_LIST_FILE ]]; then
-	echoOrange "Cracked List File Not Found!!! Creating New One......";
+	echoOrange "Cracked List File Not Found......";
 	touch $CRACKED_LIST_FILE;
 	echoGreen "Cracked List File Created......";
 else
@@ -709,7 +706,7 @@ while true; do
 
 			if [[ $(echo "$REAVER_OUTPUT" | grep -ic "detected ap rate limiting") != 0 ]]; then
 				echoRed "[!] WARNING: Detected AP rate limiting......";
-				echo "- - - - AP_RATE_LIMITING" >> $STATUS_FILE;
+				echo $(date +"%d/%m/%Y %H:%M:%S - - AP_RATE_LIMITING") >> $STATUS_FILE
 				$(killall -I reaver);
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps pin") != 0 ]]; then
 				echoGreen "$REAVER_OUTPUT";
@@ -719,9 +716,9 @@ while true; do
 				echo $(date +"%d/%m/%Y %H:%M:%S - - WPA_PSK_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "failed to recover wpa key") != 0 ]]; then
 				echoRed "$REAVER_OUTPUT";
+				echo $(date +"%d/%m/%Y %H:%M:%S - - FAILED_TO_RECOVER_WPA_KEY") >> $STATUS_FILE;
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "receive timeout occurred") != 0 ]]; then
 				echoOrange "$REAVER_OUTPUT";
-				echoOrange "[!] Reseting WIFI Adapter......";
 				echo $(date +"%d/%m/%Y %H:%M:%S - - RECEIVE_TIMEOUT") >> $STATUS_FILE;
 				$(killall -I reaver);
 			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps transaction failed") != 0 ]]; then
@@ -740,7 +737,6 @@ while true; do
 
 	if [[ $(grep -icw 'ap_rate_limiting' $STATUS_FILE) != 0 ]]; then
 		LCK_ATTEMPT=$((LCK_ATTEMPT+1));
-		echo $(date +"%d/%m/%Y %H:%M:%S $LCK_ATTEMPT $AP_LOCK AP_RATE_LIMITING") >> $STATUS_FILE;
 
 		if [[ "$AP_LOCK" == "Yes" ]]; then
 			echoRed "AP Locked......";
