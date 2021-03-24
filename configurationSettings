@@ -34,7 +34,12 @@ WPS_PIN="";
 WPA_PSK="";
 STATUS_LINE="";
 REAVER_OUTPUT="";
-LCK_ATTEMPT="";
+RATE_LIMITING_COUNT="";
+TIMEOUT_COUNT="";
+MAX_DELAY_PIN=120;
+RESCAN_AP=0;
+CHECK_APLOCK_TIMEOUT=30;
+LCK_ATTEMPT=0;
 ###### APPLICATION REQUISITES ######
 REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash" "gawk" "curl" "sed")';
 HTTP_CONN="https://www.google.com/";
