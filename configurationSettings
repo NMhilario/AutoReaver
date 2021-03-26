@@ -13,6 +13,8 @@ PATH_IEEE="/sys/class/ieee80211/";
 PATH_DRIVER="/device/driver/module/drivers/";
 PATH_DEVICE="/device/net/";
 CRACKED_LIST_FILE="$REAVER_CRACKED_DIR/crackedList";
+DEVICE_LIST_FILE="$REAVER_TMP_DIR/DeviceList";
+WASH_LIST_FILE="$REAVER_TMP_DIR/WashList"
 ###### APLICATION GLOBAL VARIABLES ######
 WIFI_CARD_DRIVER="";
 WIFI_CARD_LOGICAL="";
@@ -35,8 +37,8 @@ WPA_PSK="";
 STATUS_LINE="";
 REAVER_OUTPUT="";
 MAX_DELAY_PIN=120;
-RESCAN_AP=0;
 CHECK_APLOCK_TIMEOUT=30;
+RESCAN_AP=0;
 ###### APPLICATION REQUISITES ######
 REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash" "gawk" "curl" "sed")';
 HTTP_CONN="https://www.google.com/";

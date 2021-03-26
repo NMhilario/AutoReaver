@@ -68,28 +68,29 @@ setDeviceSettings(){
 		exitAutoReaver;
 	fi
 
-	local COUNT_DEV=1;
+	local COUNTDEV=0;
 	local STR;
 	local DRIVER;
 	local LOGICAL;
 	local PHY;
-	local WIFICHOICE;
+	local WIFICHOICE
 
-	unset option ARR_DEVICES  ERROR;
-	declare -a ARR_DEVICES;
+	if [[ -f $DEVICE_LIST_FILE ]]; then
+		$(rm $DEVICE_LIST_FILE)
+	fi
+
+	touch $DEVICE_LIST_FILE;
 
 	echoBlue "#		Physical	Device          Driver";
 	echoWhite "-----------------------------------------------------------"
 
 	for PHY in $(ls $PATH_IEEE); do
+		COUNTDEV=$((COUNTDEV+1));
 	        STR=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER);
 	        DRIVER=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER | cut -c 5-${#STR});
 	        LOGICAL=$(ls $PATH_IEEE"$PHY"$PATH_DEVICE);
-	        echoBlue "$COUNT_DEV		$PHY		$LOGICAL        $DRIVER";
-                ARR_DEVICES[${#ARR_DEVICES[@]}]="$PHY";
-                ARR_DEVICES[${#ARR_DEVICES[@]}]="$LOGICAL";
-                ARR_DEVICES[${#ARR_DEVICES[@]}]="$DRIVER";
-	        COUNT_DEV=$((COUNT_DEV+1));
+	        echoBlue "$COUNTDEV		$PHY		$LOGICAL        $DRIVER";
+		echo "$PHY $LOGICAL $DRIVER" >> $DEVICE_LIST_FILE;
 	done
 
 	echo"";
@@ -97,10 +98,10 @@ setDeviceSettings(){
 	while true; do
 	        read -p "Choose WIFI Device: " WIFICHOICE;
 
-		if [[ $WIFICHOICE -le ${#ARR_DEVICES[@]}/3 && $WIFICHOICE -gt 0 ]]; then
-			WIFI_CARD_DRIVER="${ARR_DEVICES[(WIFICHOICE*3)-1]}";
-			WIFI_CARD_LOGICAL="${ARR_DEVICES[(WIFICHOICE*3)-2]}";
-			WIFI_CARD_PHY="${ARR_DEVICES[(WIFICHOICE*3)-3]}";
+		if [[ $WIFICHOICE -le $COUNTDEV && $WIFICHOICE -ge 1 ]]; then
+			WIFI_CARD_DRIVER=$(sed -n "$((WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $3 }');
+			WIFI_CARD_LOGICAL=$(sed -n "$((WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $2 }');
+			WIFI_CARD_PHY=$(sed -n "$(($WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $1 }');
 			break;
 		else
 			echoOrange "InValid Selection...";
@@ -118,21 +119,21 @@ setDeviceSettings(){
 	fi
 
 	sleep 2;
-
-	unset ARR_DEVICES;
 }
 
 setAPSettings(){
-	local LINE;
-	local i;
+	local WASH_OUTPUT;
+	local AP;
 	local APCHOICE;
 	local YN;
-	local nTIME;
+	local SCANTIME;
 	local CMD_WASH;
-	local WASH_SCAN=1;
+	local WASH_SCAN=0;
+	local COUNTAP=0;
 
-	if [[ -f $REAVER_TMP_DIR'/wash.list' && $RESCAN_AP -eq 0 ]]; then
+	if [[ -f $WASH_LIST_FILE && $RESCAN_AP -eq 0 ]]; then
 		while true; do
+
 			read -p "Use Last WASH Scan (Y/N)?" YN && echo "";
 
 			case $YN in
@@ -157,10 +158,10 @@ setAPSettings(){
 			case $YN in
 				[Yy]* )
 					while true; do
-						read -p "Set New Scan Time [Current $WASH_TIME Sec.], (1-120): " nTIME
+						read -p "Set New Scan Time [Current $WASH_TIME Sec.], (1-120): " SCANTIME
 
-						if [[ $nTIME -ge 1 && $nTIME -le 120 ]]; then
-							WASH_TIME=$nTIME;
+						if [[ $SCANTIME -ge 1 && $SCANTIME -le 120 ]]; then
+							WASH_TIME=$SCANTIME;
 							break;
 						else
 							echoOrange "Invalid Selection......";
@@ -178,18 +179,11 @@ setAPSettings(){
 		echoBlue "Please Wait...";
 		echo "";
 
-		CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $REAVER_TMP_DIR'/wash.list'";
+		CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $WASH_LIST_FILE";
 		eval $CMD_WASH >>/dev/null;
 	fi
 
-	unset option AP_LIST ERROR;
-	declare -a AP_LIST;
-
-	while IFS= read -r LINE; do
-		AP_LIST[${#AP_LIST[@]}]="$LINE";
-	done < "$REAVER_TMP_DIR/wash.list"
-
-	if [ ${#AP_LIST[@]} -eq 2 ]; then
+	if [ $(awk 'END {print NR}' $WASH_LIST_FILE) -eq 2 ]; then
 		echoRed "No Targets in AP List...";
 		echoBlue "Try Increase WASH Scan Time...";
 
@@ -209,34 +203,35 @@ setAPSettings(){
 		done
 	fi
 
-	for (( i=0; i<${#AP_LIST[@]}; i++ )); do
-		case $i in
-			0)
-				echoBlue "#       ${AP_LIST[$i]}";;
+	while read -r WASH_OUTPUT; do
+		COUNTAP=$((COUNTAP+1));
+
+		case $COUNTAP in
 			1)
-				echoWhite  "${AP_LIST[$i]}";;
+				echoBlue "#	$WASH_OUTPUT";;
+			2)
+				echoWhite "$WASH_OUTPUT";;
 			* )
-				if [[ $(awk '{ print $5 }' <<< "${AP_LIST[$i]}") == "Yes" ]]; then
-					echoRed "$((i-1))       ${AP_LIST[$i]}";
-				elif [[ $(awk '{ print $4 }' <<< "${AP_LIST[$i]}") == "2.0" ]]; then
-					echoOrange "$((i-1))	${AP_LIST[$i]}";
+				if [[ $(awk '{ print $5 }' <<< $WASH_OUTPUT) == "Yes" ]]; then
+					echoRed "$((COUNTAP-2))	$WASH_OUTPUT";
+				elif [[ $(awk '{ print $4 }' <<< $WASH_OUTPUT) == "2.0" ]]; then
+					echoOrange "$((COUNTAP-2))	$WASH_OUTPUT";
 				else
-					echoGreen "$((i-1))      ${AP_LIST[$i]}";
+					echoGreen "$((COUNTAP-2))	$WASH_OUTPUT";
 				fi
 		esac
-	done
-
+	done < "$WASH_LIST_FILE"
 	echo "";
 
 	while true; do
-		read -p "Choose AP (1-$((${#AP_LIST[@]}-2))), (0) to All, (R)escan : " APCHOICE;
+		read -p "Choose AP (1-$(($COUNTAP-2))), (0) to All, (R)escan : " APCHOICE;
 
-		if [[ $APCHOICE -le ${#AP_LIST[@]}-2 && $APCHOICE -gt 0 ]]; then
-			AP_BSSID=$(awk '{ print $1 }' <<< "${AP_LIST[$APCHOICE+1]}");
-			AP_CHANNEL=$(awk '{ print $2 }' <<< "${AP_LIST[$APCHOICE+1]}");
-			AP_ESSID=$(awk '{ print $7 }' <<< "${AP_LIST[$APCHOICE+1]}");
-			AP_WPS=$(awk '{ print $4 }' <<< "${AP_LIST[$APCHOICE+1]}");
-			AP_LOCK=$(awk '{ print $5 }' <<< "${AP_LIST[$APCHOICE+1]}");
+		if [[ $APCHOICE -le $COUNTAP-2 && $APCHOICE -ge 1 ]]; then
+			AP_BSSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $1 }');
+			AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $2 }');
+			AP_ESSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $7 }');
+			AP_WPS=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $4 }');
+			AP_LOCK=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $5 }');
 			break;
 		else
 			if [[ "$APCHOICE" == "0" ]]; then
@@ -253,7 +248,6 @@ setAPSettings(){
 		fi
 	done
 
-	unset AP_LIST;
 	RESCAN_AP=0;
 }
 
@@ -476,7 +470,7 @@ unlockAP(){
 
 			echo -e "\n\n"
 
-			timeout 10 reaver -i $MON_INTERFACE -e $AP_SSID -b $AP_BSSID --no-nacks -vv -s $PREV_SE>
+#			timeout 10 reaver -i $MON_INTERFACE -e $AP_SSID -b $AP_BSSID --no-nacks -vv -s $PREV_SE>
 			countTryPin=$[countTryPin + 1]
 			kill -9 $airodump_pid
 			wait $airodump_pid 2> null
