@@ -646,6 +646,11 @@ fi
 
 if [[ ! -d "$REAVER_TMP_DIR" ]]; then
         mkdir -p -m 700 $REAVER_TMP_DIR;
+else
+	if [[ ! -z $(ls $REAVER_TMP_DIR'/'*'MDK3') ]]; then
+		$(rm $REAVER_TMP_DIR'/'*'MDK3');
+		echo "MDK3 Files Deleted......";
+	fi
 fi
 
 if [[ ! -d "$REAVER_SESSION_DIR" ]]; then
