@@ -41,6 +41,7 @@ MAX_DELAY_PIN=120;
 CHECK_APLOCK_TIMEOUT=30;
 RESCAN_AP=0;
 AP_STATUS_FROM=0;
+MDK3_FILECOUNT=0;
 ###### APPLICATION REQUISITES ######
 REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash" "gawk" "curl" "sed")';
 HTTP_CONN="https://www.google.com/";

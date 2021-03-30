@@ -372,8 +372,6 @@ checkLockStatus(){
 		done
 
 		echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_LOCK_STATUS)") >> $STATUS_FILE
-
-		$(rm $CHECK_LOCK_STATUS);
 	}
 
 	case $(echo $CHECK_LOCK_STATUS) in
@@ -381,10 +379,15 @@ checkLockStatus(){
 			AP_LOCK="Yes";;
 		["AP_CHECK_STATUS_UNLOCKED"]* )
 			AP_LOCK="No";;
+		["AP_NOT_FOUND"]* )
+			CHECK_APLOCK_TIMEOUT=$((CHECK_APLOCK_TIMEOUT+5));
+			checkLockStatus;;
 	esac
 
+	$(rm $CHECK_LOCK_STATUS);
+
 	case $AP_STATUS_FROM in
-		[1]* ) ### AP Status Request by MDK3
+		1)
 			if [[ $(cat $MDK3_STATUS) -eq $MAX_CLIENTS ]]; then
 				$(rm $MDK3_STATUS);
 			else
@@ -393,6 +396,14 @@ checkLockStatus(){
 					unlockAP;
 				fi
 			fi
+			;;
+		2)
+			if [[ "$AP_LOCK" == "Yes" ]]; then
+				echoRed "AP Is Locked......";
+			else
+				echoGreen "AP Is Not Locked......";
+			fi
+			;;
 	esac
 }
 
@@ -647,10 +658,11 @@ fi
 if [[ ! -d "$REAVER_TMP_DIR" ]]; then
         mkdir -p -m 700 $REAVER_TMP_DIR;
 else
-	if [[ ! -z $(ls $REAVER_TMP_DIR'/'*'MDK3') ]]; then
-		$(rm $REAVER_TMP_DIR'/'*'MDK3');
-		echo "MDK3 Files Deleted......";
-	fi
+	for MDK3_FILECOUNT in $(ls $REAVER_TMP_DIR); do
+		if [[ $(echo $MDK3_FILECOUNT | cut -c $((${#MDK3_FILECOUNT}-3))-${#MDK3_FILECOUNT}) == "MDK3" ]]; then
+			$(rm $REAVER_TMP_DIR'/'$MDK3_FILECOUNT);
+		fi
+	done
 fi
 
 if [[ ! -d "$REAVER_SESSION_DIR" ]]; then
