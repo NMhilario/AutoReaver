@@ -39,6 +39,7 @@ STATUS_LINE="";
 REAVER_OUTPUT="";
 MAX_DELAY_PIN=120;
 CHECK_APLOCK_TIMEOUT=30;
+MAX_WASH_ATTEMPT=4;
 RESCAN_AP=0;
 AP_STATUS_FROM=0;
 MDK3_FILECOUNT=0;
@@ -47,7 +48,7 @@ REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash" "gawk" "curl" 
 HTTP_CONN="https://www.google.com/";
 ###### MDK3 ######
 MAX_CLIENTS=700000;
-MAX_CLIENTS_TURN=100000;
+MAX_CLIENTS_TURN=50000;
 ###### AIREPLAY-NG ######
 FAKE_AUTH_DELAY_SECONDS=60;
 ###### REAVER OPTIONS ######

