@@ -4,7 +4,7 @@
 ######## AUTO-REAVER CONFIGURATION SETTINGS #########
 #####################################################
 
-###### APLICATION PATHS/FILES ######
+###### SCRIPT PATHS/FILES ######
 REAVER_DIR=$(pwd);
 REAVER_SESSION_DIR="$REAVER_DIR/SESSION";
 REAVER_TMP_DIR="$REAVER_DIR/TMP";
@@ -17,8 +17,7 @@ DEVICE_LIST_FILE="$REAVER_TMP_DIR/DeviceList";
 WASH_LIST_FILE="$REAVER_TMP_DIR/WashList"
 SESSION_FILE="";
 STATUS_FILE="";
-MDK3_STATUS="";
-###### APLICATION GLOBAL VARIABLES ######
+###### SCRIPT GLOBAL VARIABLES ######
 WIFI_CARD_DRIVER="";
 WIFI_CARD_LOGICAL="";
 WIFI_CARD_PHY="";
@@ -37,10 +36,8 @@ WPS_PIN="";
 WPA_PSK="";
 STATUS_LINE="";
 REAVER_OUTPUT="";
-CHECK_APLOCK_TIMEOUT=30;
-MAX_WASH_ATTEMPT=4;
 RESCAN_AP=0;
-###### APPLICATION REQUISITES ######
+###### SCRIPT REQUISITES ######
 REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash" "gawk" "curl" "sed")';
 HTTP_CONN="https://www.google.com/";
 ###### MDK3 ######
@@ -48,12 +45,15 @@ MAX_CLIENTS=800000;
 MAX_CLIENTS_BREAK=40000;
 ###### AIREPLAY-NG ######
 FAKE_AUTH_DELAY_SECONDS=60;
-###### REAVER OPTIONS ######
+###### REAVER ######
 REAVER_ARGS='("-i " "-b " "-m " "-e " "-c " "-s " "-C " "-f " "-5 none" "-vv none" "-q none" "-p " "-d " "-l " "-g " "-x " "-r " "-t " "-T " "-A none" "-N none" "-S none" "-L none" "-E none" "-J none" "-F none" "-w none" "-K none" "-Z none" "-O ")';
 REAVER_PIN_ATTEMPTS=3;
 REAVER_ATTEMPT_DELAY=0;
 MAX_ATTEMPT_DELAY=120;
 ADDITIONAL_OPTIONS_YN="Yes";
 ADDITIONAL_OPTIONS="-E -S -N -T 1 -t 15 --win7";
-###### WASH SCAN TIME ######
+###### WASH ######
 WASH_TIME=20;
+MAX_WASH_ATTEMPT=4;
+CHECK_APLOCK_TIMEOUT=30;
+MAX_WASH_ATTEMPT=4;

