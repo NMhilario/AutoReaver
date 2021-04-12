@@ -1,0 +1,33 @@
+Required Arguments---------------------------------------------------------------
+-i null null Name_of_the_monitor-mode_interface_to_use
+-b null null BSSID_of_the_target_AP
+Optional Arguments---------------------------------------------------------------
+-m null null MAC_of_the_host_system
+-e null null ESSID_of_the_target_AP
+-c null null Set_the_802.11_channel_for_the_interface_(implies_-f)
+-s null null Restore_a_previous_session_file
+-C null null Execute_the_supplied_command_upon_successful_pin_recovery
+-f null null Disable_channel_hopping
+-5 null null Use_5GHz_802.11_channels
+-v null null Display_non-critical_warnings_(-vv_or_-vvv_for_more)
+-q null null Only_display_critical_messages
+Advanced Options------------------------------------------------------------------
+-p null null Use_the_specified_pin_(may_be_arbitrary_string_or_4/8_digit_WPS_pin)
+-d null null Set the delay between pin attempts [1]
+-l null null Set the time to wait if the AP locks WPS pin attempts [60]
+-g null null Quit after num pin attempts
+-x null null Set the time to sleep after 10 unexpected failures [0]
+-r null null Sleep for y seconds every x pin attempts
+-t null null Set the receive timeout period [10]
+-T null null Set the M5/M7 timeout period [0.40]
+-A null null Do not associate with the AP (association must be done by another application)
+-N null null Do not send NACK messages when out of order packets are received
+-S null null Use small DH keys to improve crack speed
+-L null null Ignore locked state reported by the target AP
+-E null null Terminate each WPS session with an EAP FAIL packet
+-J null null Treat timeout as NACK (DIR-300/320)
+-F null null Ignore frame checksum errors
+-w null null Mimic a Windows 7 registrar [False]
+-K null null Run pixiedust attack
+-Z null null Run pixiedust attack
+-O null null Write packets of interest into pcap file

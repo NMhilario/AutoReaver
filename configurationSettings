@@ -49,11 +49,9 @@ FAKE_AUTH_DELAY_SECONDS=60;
 REAVER_ARGS='("-i " "-b " "-m " "-e " "-c " "-s " "-C " "-f " "-5 none" "-vv none" "-q none" "-p " "-d " "-l " "-g " "-x " "-r " "-t " "-T " "-A none" "-N none" "-S none" "-L none" "-E none" "-J none" "-F none" "-w none" "-K none" "-Z none" "-O ")';
 REAVER_PIN_ATTEMPTS=3;
 REAVER_ATTEMPT_DELAY=0;
-MAX_ATTEMPT_DELAY=120;
 ADDITIONAL_OPTIONS_YN="Yes";
 ADDITIONAL_OPTIONS="-E -S -N -T 1 -t 15 --win7";
 ###### WASH ######
 WASH_TIME=20;
 MAX_WASH_ATTEMPT=4;
-CHECK_APLOCK_TIMEOUT=30;
-MAX_WASH_ATTEMPT=4;
+WASH_TIMEOUT=30;
