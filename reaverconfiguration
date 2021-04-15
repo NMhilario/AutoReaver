@@ -13,21 +13,21 @@ Optional Arguments--------------------------------------------------------------
 -q null null Only_display_critical_messages
 Advanced Options------------------------------------------------------------------
 -p null null Use_the_specified_pin_(may_be_arbitrary_string_or_4/8_digit_WPS_pin)
--d null null Set the delay between pin attempts [1]
--l null null Set the time to wait if the AP locks WPS pin attempts [60]
--g null null Quit after num pin attempts
--x null null Set the time to sleep after 10 unexpected failures [0]
--r null null Sleep for y seconds every x pin attempts
--t null null Set the receive timeout period [10]
--T null null Set the M5/M7 timeout period [0.40]
--A null null Do not associate with the AP (association must be done by another application)
--N null null Do not send NACK messages when out of order packets are received
--S null null Use small DH keys to improve crack speed
--L null null Ignore locked state reported by the target AP
--E null null Terminate each WPS session with an EAP FAIL packet
--J null null Treat timeout as NACK (DIR-300/320)
--F null null Ignore frame checksum errors
--w null null Mimic a Windows 7 registrar [False]
--K null null Run pixiedust attack
--Z null null Run pixiedust attack
--O null null Write packets of interest into pcap file
+-d null null Set_the_delay_between_pin_attempts_[1]
+-l null null Set_the_time_to_wait_if_the_AP_locks_WPS_pin_attempts_[60]
+-g null null Quit_after_num_pin_attempts
+-x null null Set_the_time_to_sleep_after_10 unexpected_failures_[0]
+-r null null Sleep_for_y_seconds_every_x_pin_attempts
+-t null null Set_the_receive_timeout_period_[10]
+-T null null Set_the_M5/M7_timeout_period_[0.40]
+-A null null Do_not_associate_with_the_AP_(association_must_be_done_by_another_application)
+-N null null Do_not_send_NACK_messages_when_out_of_order_packets_are_received
+-S null null Use_small_DH_keys_to_improve_crack_speed
+-L null null Ignore_locked_state_reported_by_the_target_AP
+-E null null Terminate_each_WPS_session_with_an_EAP_FAIL_packet
+-J null null Treat_timeout_as_NACK_(DIR-300/320)
+-F null null Ignore_frame_checksum_errors
+-w null null Mimic_a_Windows_7_registrar_[False]
+-K null null Run_pixiedust_attack
+-Z null null Run_pixiedust_attack
+-O null null Write_packets_of_interest_into_pcap_file

