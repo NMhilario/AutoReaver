@@ -13,13 +13,13 @@ Optional Arguments--------------------------------------------------------------
 -q null null Only_display_critical_messages
 Advanced Options------------------------------------------------------------------
 -p null null Use_the_specified_pin_(may_be_arbitrary_string_or_4/8_digit_WPS_pin)
--d null null Set_the_delay_between_pin_attempts_[1]
--l null null Set_the_time_to_wait_if_the_AP_locks_WPS_pin_attempts_[60]
+-d 0 null Set_the_delay_between_pin_attempts
+-l 60 null Set_the_time_to_wait_if_the_AP_locks_WPS_pin_attempts
 -g null null Quit_after_num_pin_attempts
--x null null Set_the_time_to_sleep_after_10 unexpected_failures_[0]
+-x 0 null Set_the_time_to_sleep_after_10 unexpected_failures
 -r null null Sleep_for_y_seconds_every_x_pin_attempts
--t null null Set_the_receive_timeout_period_[10]
--T null null Set_the_M5/M7_timeout_period_[0.40]
+-t 10 null Set_the_receive_timeout_period
+-T 0.40 null Set_the_M5/M7_timeout_period
 -A null null Do_not_associate_with_the_AP_(association_must_be_done_by_another_application)
 -N null null Do_not_send_NACK_messages_when_out_of_order_packets_are_received
 -S null null Use_small_DH_keys_to_improve_crack_speed

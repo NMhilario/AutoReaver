@@ -463,10 +463,7 @@ unlockAP(){
 						echo $(date +"%d/%m/%Y %H:%M:%S MDK3_FLOOD_ATTACK_$(echo $LOOP_TARGET | cut -d, -f$COUNT)") >> $STATUS_FILE;
 						checkAPStatus;
 
-						if [[ "$AP_LOCK" == "No" ]]; then
-							break;
-						elif [[ "$AP_LOCK" == "NULL" ]]; then
-							echoRed "AP Not Found......";
+						if [[ "$AP_LOCK" == "No" || "$AP_LOCK" == "NULL" ]]; then
 							break;
 						fi
 
@@ -835,11 +832,14 @@ while true; do
 				break;
 			fi
 		else
-			if [[ $REAVER_ATTEMPT_DELAY -eq 0 ]]; then
+			if [[ $REAVER_ATTEMPT_DELAY -lt 60 ]]; then
 				REAVER_ATTEMPT_DELAY=60;
-				echo $(date +"%d/%m/%Y %H:%M:%S REAVER_ATTEMPT_DELAY_INCREASED_$REAVER_ATTEMPT_DELAY") >> $STATUS_FILE;
+				echo $(date +"%d/%m/%Y %H:%M:%S REAVER_ATTEMPT_DELAY_CHANGED_$REAVER_ATTEMPT_DELAY") >> $STATUS_FILE;
 			else
-				REAVER_PIN_ATTEMPTS=1;
+				if [[ $REAVER_PIN_ATTEMPTS -gt 1 ]]; then
+					REAVER_PIN_ATTEMPTS=1;
+				fi
+
 				echo $(date +"%d/%m/%Y %H:%M:%S REAVER_PIN_ATTEMPTS_CHANGED_$REAVER_PIN_ATTEMPTS") >> $STATUS_FILE;
 
 				checkAPStatus;
