@@ -64,11 +64,10 @@ echoGreen(){
 }
 
 setDeviceSettings(){
-        if [ ! -d "$PATH_IEEE" ] || [ ! "$(ls -A $PATH_IEEE)" ]; then
+        if [[ ! -d "$PATH_IEEE" || ! "$(ls -A $PATH_IEEE)" ]]; then
                 echoWhite "---------------------------";
                 echoRed "No WIFI Devices Detected!!!";
-                echoWhite "---------------------------";
-                echo "";
+                echoWhite "---------------------------" && echo "";
 		exitAutoReaver;
 	fi
 
@@ -107,14 +106,12 @@ setDeviceSettings(){
 			WIFI_CARD_LOGICAL=$(sed -n "$((WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $2 }');
 			WIFI_CARD_PHY=$(sed -n "$(($WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $1 }');
 			break;
-		else
-			echoOrange "InValid Selection...";
 		fi
+
+		echoOrange "InValid Selection...";
 	done
 
-	echo "";
-	echoBlue "Checking if Selected Device is in Monitor Mode......";
-	echo "";
+	echo "" && echoBlue "Checking if Selected Device is in Monitor Mode......" && echo "";
 
 	getMonitorName;
 
@@ -122,7 +119,7 @@ setDeviceSettings(){
 		stopMonitor;
 	fi
 
-	sleep 2;
+	sleep 1;
 }
 
 setAPSettings(){
@@ -132,7 +129,8 @@ setAPSettings(){
 	local YN;
 	local SCANTIME;
 	local CMD_WASH;
-	local WASH_SCAN=0;
+	local RESCAN_AP;
+	local WASH_SCAN;
 	local COUNTAP=0;
 
 	if [[ -f $WASH_LIST_FILE && $RESCAN_AP -eq 0 ]]; then
@@ -147,12 +145,10 @@ setAPSettings(){
 				[Nn]* )
 					WASH_SCAN=1;
 					break;;
-				* )
-					echoOrange "Invalid Selection......";;
 			esac
+
+			echoOrange "Invalid Selection......";
 		done
-	else
-		WASH_SCAN=1;
 	fi
 
 	if [[ $WASH_SCAN -eq 1 ]]; then
@@ -167,16 +163,14 @@ setAPSettings(){
 						if [[ $SCANTIME -ge 1 && $SCANTIME -le 120 ]]; then
 							WASH_TIME=$SCANTIME;
 							break;
-						else
-							echoOrange "Invalid Selection......";
 						fi
 					done
 					;;
 				[Yy]* )
 					break;;
-				* )
-					echoOrange "Invalid Selection......";;
 			esac
+
+			echoOrange "Invalid Selection......";
 		done
 
 		echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR;
@@ -214,7 +208,7 @@ setAPSettings(){
 				echoBlue "#	$WASH_OUTPUT";;
 			2)
 				echoWhite "$WASH_OUTPUT";;
-			* )
+			*)
 				if [[ $(awk '{ print $5 }' <<< $WASH_OUTPUT) == "Yes" ]]; then
 					echoRed "$((COUNTAP-2))	$WASH_OUTPUT";
 				elif [[ $(awk '{ print $4 }' <<< $WASH_OUTPUT) == "2.0" ]]; then
@@ -223,35 +217,35 @@ setAPSettings(){
 					echoGreen "$((COUNTAP-2))	$WASH_OUTPUT";
 				fi
 		esac
-	done < "$WASH_LIST_FILE"
-	echo "";
+	done < "$WASH_LIST_FILE" && echo "";
 
 	while true; do
 		read -p "Choose AP (1-$(($COUNTAP-2))), (0) to All, (R)escan : " APCHOICE;
 
-		if [[ $APCHOICE -le $(($COUNTAP-2)) && $APCHOICE -ge 1 ]]; then
-			AP_BSSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $1 }');
-			AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $2 }');
-			AP_ESSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $7 }');
-			AP_WPS=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $4 }');
-			AP_LOCK=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $5 }');
-			break;
-		else
-			if [[ "$APCHOICE" == "0" ]]; then
-				###### All option will allow this script to loop the wash output result
-				echoRed "All... is Currently Unavailable. Please Select Single Target.";
-			elif [[ "$APCHOICE" == "r" || "$APCHOICE" == "R" ]]; then
+		case $APCHOICE in
+			[Rr]* )
 				clear;
 				RESCAN_AP=1;
+				WASH_SCAN=1;
 				setAPSettings;
-				break;
-			else
-				echoOrange "Invalid Selection......";
-			fi
-		fi
+				break;;
+			0)
+				echoRed "All... is Currently Unavailable. Please Select Single Target.";;
+			*)
+				if [[ $APCHOICE -le $(($COUNTAP-2)) && $APCHOICE -ge 1 ]]; then
+					AP_BSSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $1 }');
+					AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $2 }');
+					AP_ESSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $7 }');
+					AP_WPS=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $4 }');
+					AP_LOCK=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $5 }');
+					break;
+				fi
+		esac
+
+		echoOrange "Invalid Selection......";
 	done
 
-	RESCAN_AP=0;
+#	RESCAN_AP=0;
 }
 
 setAutoReaverOpt(){
