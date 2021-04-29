@@ -1,4 +1,4 @@
-!#/bin/bash
+#!/bin/bash
 
 echo "            OOOOO                            OOOOOOOOO"
 echo "           O    O                            O        O"
@@ -16,7 +16,7 @@ echo " -------------------------------------------------------------------------
 echo " Reaver v1.6.6 WiFi Protected Setup Attack Tool"
 echo " Copyright (c) 2011, Tactical Network Solutions, Craig Heffner <cheffner@tacnetsol.com>"
 echo " ---------------------------------------------------------------------------------------------------------"
-echo " MDK 3.0 v6 - "Yeah, well, whatever"
+echo " MDK 3.0 v6 - Yeah, well, whatever"
 echo " by ASPj of k2wrlz, using the osdep library from aircrack-ng"
 echo " And with lots of help from the great aircrack-ng community:"
 echo " Antragon, moongray, Ace, Zero_Chaos, Hirte, thefkboss, ducttape,"

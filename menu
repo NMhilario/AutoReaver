@@ -1,2 +1,4 @@
-!#/bin/bash
-
+1 Update UpdateDistro
+2 Check_Requisites checkRequisites
+3 AutoReaver autoReaver
+4 Exit exitAutoReaver
