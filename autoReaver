@@ -199,9 +199,9 @@ setAPSettings(){
 					setAPSettings;;
 				[Nn]* )
 					exitAutoReaver;;
-				* )
-					echoOrange "Invalid Selection......";;
 			esac
+
+			echoOrange "Invalid Selection......";
 		done
 	fi
 
@@ -241,6 +241,7 @@ setAPSettings(){
 				if [[ $APCHOICE -le $((COUNTAP-2)) && $APCHOICE -ge 1 ]]; then
 					AP_BSSID=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $1 }');
 					AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $2 }');
+# Get Full ESSID Names even with spaces
 #					echo $(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk 'END{ print NF }')
 					AP_ESSID=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $7 }');
 					AP_WPS=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $4 }');
@@ -353,13 +354,13 @@ reaverConfig(){
 }
 
 setAPStatus(){
+# Changes according to Shellcheck, need testing
 	local CHECK_AP_STATUS;
 	local WASH_ATTEMPT;
 
 	CHECK_AP_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.APStatus';
 
 	if [[ -f $CHECK_AP_STATUS ]]; then
-
 		if [[ "$(echo "$(<"$CHECK_AP_STATUS")" | awk --field-separator='_' '{ print $5 }')" != "$AP_CHANNEL" && "$(echo "$(<"$CHECK_AP_STATUS")" | awk --field-separator='_' '{ print $4 }')" != "NOT-FOUND" ]]; then
 			AP_CHANNEL="$(echo "$(<"$CHECK_AP_STATUS")" | awk --field-separator='_' '{ print $5 }')";
 			echoGreen "AP Channel Changed To $AP_CHANNEL......";
@@ -411,26 +412,28 @@ checkAPStatus(){
 
 	CHECK_AP_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.APStatus';
 
-	if [[ ! -f $CHECK_AP_STATUS ]]; then touch "$CHECK_AP_STATUS"; fi;
+	if [[ -f $CHECK_AP_STATUS ]]; then
+		CMD_LOCK_STATUS="timeout --preserve-status $WASH_TIMEOUT wash -i $WIFI_CARD_MONITOR";
+		eval "$CMD_LOCK_STATUS" | {
+			while read -r WASH_OUTPUT; do
+				if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") -eq 1 ]]; then
+					if [[ "$(awk '{ print $5 }' <<< "$WASH_OUTPUT")" == "Yes" ]]; then
+						echo "AP_CHECK_STATUS_LOCKED_$(awk '{ print $2 }' <<< "$WASH_OUTPUT")" > "$CHECK_AP_STATUS";
+					else
+						echo "AP_CHECK_STATUS_UNLOCKED_$(awk '{ print $2 }' <<< "$WASH_OUTPUT")" > "$CHECK_AP_STATUS";
+					fi
 
-	CMD_LOCK_STATUS="timeout --preserve-status $WASH_TIMEOUT wash -i $WIFI_CARD_MONITOR";
-	eval "$CMD_LOCK_STATUS" | {
-		while read -r WASH_OUTPUT; do
-			if [[ $(echo "$WASH_OUTPUT" | grep -ic "$AP_BSSID") -eq 1 ]]; then
-				if [[ "$(awk '{ print $5 }' <<< "$WASH_OUTPUT")" == "Yes" ]]; then
-					echo "AP_CHECK_STATUS_LOCKED_$(awk '{ print $2 }' <<< "$WASH_OUTPUT")" > "$CHECK_AP_STATUS";
+					break;
 				else
-					echo "AP_CHECK_STATUS_UNLOCKED_$(awk '{ print $2 }' <<< "$WASH_OUTPUT")" > "$CHECK_AP_STATUS";
+					echo "AP_CHECK_STATUS_NOT-FOUND" > "$CHECK_AP_STATUS";
 				fi
+			done
+		}
 
-				break;
-			else
-				echo "AP_CHECK_STATUS_NOT-FOUND" > "$CHECK_AP_STATUS";
-			fi
-		done
-	}
-
-	setAPStatus;
+		setAPStatus;
+	else
+		echoRed "Check AP Status File Missing......";
+	fi
 }
 
 unlockAP(){
@@ -607,8 +610,7 @@ checkRequisites(){
 	unset ARR_REQUISITES;
 
 	if [ ${#MISS_REQUISITES[@]} -gt 0 ]; then
-		# shellcheck disable=SC2124
-		MISSING="${MISS_REQUISITES[@]}";
+		MISSING="${MISS_REQUISITES[*]}";
 		echoRed "Following Requisites, $MISSING, are Missing......";
 
 		while true; do
@@ -751,7 +753,7 @@ autoReaver(){
 	stopMonitor && resetDeviceDriver && RandomMac &&  startMonitor;
 
 	# shellcheck disable=SC2001
-	BSSID_CLEAR=$(echo "$AP_BSSID" | sed s/://g);
+	BSSID_CLEAR=$(sed s/://g <<< "$AP_BSSID");
 	SESSION_FILE=$REAVER_SESSION_DIR'/'$BSSID_CLEAR'.session';
 	STATUS_FILE=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.status'
 	echo "BSSID: $AP_BSSID CHANNEL: $AP_CHANNEL ESSID: $AP_ESSID" >> "$STATUS_FILE"
