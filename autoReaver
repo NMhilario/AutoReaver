@@ -36,7 +36,6 @@ if [ $EUID -ne 0 ]; then
 	echo "Please run as root!!!";
 	exit;
 fi
-
 # shellcheck disable=SC1090
 source "$(pwd)/configurationSettings";
 # shellcheck disable=SC1090
@@ -86,8 +85,7 @@ setDeviceSettings(){
 		exitAutoReaver;
 	fi
 
-	# shellcheck disable=SC2091
-	if [[ -f $DEVICE_LIST_FILE ]]; then $(rm "$DEVICE_LIST_FILE"); fi;
+	if [[ -f $DEVICE_LIST_FILE ]]; then rm "$DEVICE_LIST_FILE"; fi;
 
 	touch "$DEVICE_LIST_FILE";
 
@@ -361,14 +359,13 @@ setAPStatus(){
 	CHECK_AP_STATUS=$REAVER_TMP_DIR'/'$BSSID_CLEAR'.APStatus';
 
 	if [[ -f $CHECK_AP_STATUS ]]; then
-		# shellcheck disable=SC2002
-		if [[ "$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $5 }')" != "$AP_CHANNEL" && "$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $4 }')" != "NOT-FOUND" ]]; then
-			AP_CHANNEL="$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $5 }')";
+
+		if [[ "$(echo "$(<"$CHECK_AP_STATUS")" | awk --field-separator='_' '{ print $5 }')" != "$AP_CHANNEL" && "$(echo "$(<"$CHECK_AP_STATUS")" | awk --field-separator='_' '{ print $4 }')" != "NOT-FOUND" ]]; then
+			AP_CHANNEL="$(echo "$(<"$CHECK_AP_STATUS")" | awk --field-separator='_' '{ print $5 }')";
 			echoGreen "AP Channel Changed To $AP_CHANNEL......";
 		fi
 
-		# shellcheck disable=SC2002
-		case "$(cat "$CHECK_AP_STATUS" | awk --field-separator='_' '{ print $4 }')" in
+		case "$(echo "$(<"$CHECK_AP_STATUS")" | awk --field-separator='_' '{ print $4 }')" in
 			"LOCKED")
 				AP_LOCK="Yes";
 				echoRed "AP Is Locked......";
