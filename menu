@@ -1,4 +1,5 @@
-1 Update UpdateDistro
-2 Check_Requisites checkRequisites
-3 AutoReaver autoReaver
-4 Exit exitAutoReaver
+Update UpdateDistro
+Check_Requisites checkRequisites
+Cracked_AP_List listCrackedAP
+AutoReaver autoReaver
+Exit exitAutoReaver
