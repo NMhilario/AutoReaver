@@ -83,18 +83,39 @@ Menu(){
 
 	while true; do
 		# shellcheck disable=SC2162
-		read -p "Choose WIFI Device: " MENUCHOICE;
+		read -p "Option: " MENUCHOICE;
 
 		if [[ $MENUCHOICE -le $COUNTMENU && $MENUCHOICE -ge 1 ]]; then
-			break;
+			clear;
+			# shellcheck disable=SC2091
+			# Output is to be executed
+			$(sed -n "$((MENUCHOICE))p" "$MENU_FILE" | awk '{ print $2 }');
+			clear && Menu;
+		else
+			echoOrange "InValid Selection...";
 		fi
-
-		echoOrange "InValid Selection...";
 	done
-sleep 4;
-	checkRequisites;
-	autoReaver;
-	exitAutoReaver;
+}
+
+UpdateDistro(){
+	local UPDATE_OUTPUT;
+	local CMD_UPDATE;
+
+	CMD_UPDATE="apt update 2>/dev/null | grep -ic 'packages can be upgraded'";
+
+	eval "$CMD_UPDATE" | {
+		while read -r UPDATE_OUTPUT; do
+			if [[ $(echo "$UPDATE_OUTPUT") -gt 0 ]]; then
+				apt upgrade -y && apt dist-upgrade -Vy && apt autoremove -y && apt autoclean && apt clean;
+			fi
+
+			echoGreen "All Packages are up to date......" && sleep 2 && break;
+		done
+	}
+}
+
+listCrackedAP(){
+	local somevar;
 }
 
 setDeviceSettings(){
@@ -208,6 +229,10 @@ setAPSettings(){
 		echoBlue "Please Wait...";
 		echo "";
 
+		if [[ -f $WASH_LIST_FILE ]]; then rm "$WASH_LIST_FILE"; fi
+
+		touch "$WASH_LIST_FILE";
+
 		CMD_WASH="timeout --preserve-status $WASH_TIME wash -i $WIFI_CARD_MONITOR > $WASH_LIST_FILE";
 		eval "$CMD_WASH" >>/dev/null;
 	fi
@@ -242,6 +267,7 @@ setAPSettings(){
 			2)
 				echoWhite "$WASH_OUTPUT";;
 			*)
+# Check for empty vendor field
 				if [[ $(awk '{ print $5 }' <<< "$WASH_OUTPUT") == "Yes" ]]; then
 					echoRed "$((COUNTAP-2))	$WASH_OUTPUT";
 				elif [[ $(awk '{ print $4 }' <<< "$WASH_OUTPUT") == "2.0" ]]; then
@@ -269,8 +295,7 @@ setAPSettings(){
 				if [[ $APCHOICE -le $((COUNTAP-2)) && $APCHOICE -ge 1 ]]; then
 					AP_BSSID=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $1 }');
 					AP_CHANNEL=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $2 }');
-# Get Full ESSID Names even with spaces
-#					echo $(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk 'END{ print NF }')
+# sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ for(i=6;i<=NF;++i) printf "%s ", $i; print "" }'
 					AP_ESSID=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $7 }');
 					AP_WPS=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $4 }');
 					AP_LOCK=$(sed -n "$((APCHOICE+2))p" "$WASH_LIST_FILE" | awk '{ print $5 }');
@@ -380,7 +405,6 @@ reaverConfig(){
 }
 
 setAPStatus(){
-# Changes according to Shellcheck, need testing
 	local CHECK_AP_STATUS;
 	local WASH_ATTEMPT;
 
@@ -716,6 +740,8 @@ autoReaver(){
 
 	clear;
 
+	checkRequisites;
+
 	while true; do
 		PROCEED=0;
 
@@ -834,6 +860,8 @@ autoReaver(){
 					echoBlue "$REAVER_OUTPUT";
 				fi
 			done
+
+			sleep 2 && clear;
 		}
 
 		if [[ "$(awk 'END {print $3}' "$STATUS_FILE")" == "AP_RATE_LIMITING" ]]; then
