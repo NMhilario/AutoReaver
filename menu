@@ -2,4 +2,5 @@ Update UpdateDistro
 Check_Requisites checkRequisites
 Cracked_AP_List listCrackedAP
 AutoReaver autoReaver
+Configuration configuration
 Exit exitAutoReaver

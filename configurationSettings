@@ -34,6 +34,9 @@ WIFI_CARD_RNDMAC="";
 BSSID_CLEAR="";
 RESCAN_AP=0;
 WASH_SCAN=1;
+MENU_OUTPUT="";
+COUNTMENU="";
+MENUCHOICE="";
 ###### SCRIPT REQUISITES ######
 REQUISITES='("reaver" "macchanger" "aircrack-ng" "konsole" "wash" "gawk" "curl" "sed" "mdk3")';
 HTTP_CONN="https://www.google.com/";

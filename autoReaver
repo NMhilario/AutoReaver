@@ -36,6 +36,7 @@ if [ $EUID -ne 0 ]; then
 	echo "Please run as root!!!";
 	exit;
 fi
+
 # shellcheck disable=SC1090
 source "$(pwd)/configurationSettings";
 # shellcheck disable=SC1090
@@ -65,53 +66,33 @@ echoGreen(){
         echo "$(tput setaf 34)${1}$(tput sgr0)";
 }
 
-Menu(){
-	local MENU_OUTPUT;
-	local COUNTMENU;
-	local MENUCHOICE;
-
-	echoBlue "MENU";
-	echoWhite "--------------------------";
-
-	while read -r MENU_OUTPUT; do
-		COUNTMENU=$((COUNTMENU+1));
-
-		echoBlue "$COUNTMENU	$(awk '{ print $1 }' <<< "$MENU_OUTPUT" | sed 's/_/ /g')";
-	done < "$MENU_FILE"
-
-	echoWhite "--------------------------";
-
-	while true; do
-		# shellcheck disable=SC2162
-		read -p "Option: " MENUCHOICE;
-
-		if [[ $MENUCHOICE -le $COUNTMENU && $MENUCHOICE -ge 1 ]]; then
-			clear;
-			# shellcheck disable=SC2091
-			# Output is to be executed
-			$(sed -n "$((MENUCHOICE))p" "$MENU_FILE" | awk '{ print $2 }');
-			clear && Menu;
-		else
-			echoOrange "InValid Selection...";
-		fi
-	done
-}
-
 UpdateDistro(){
 	local UPDATE_OUTPUT;
 	local CMD_UPDATE;
 
-	CMD_UPDATE="apt update 2>/dev/null | grep -ic 'packages can be upgraded'";
+	case "$(curl -s --max-time 2 -I "$HTTP_CONN" | sed 's/^[^ ]*  *\([0-9]\).*/\1/; 1q')" in
+		[23]* )
+			echoGreen "HTTP Connectivity is up......";
 
-	eval "$CMD_UPDATE" | {
-		while read -r UPDATE_OUTPUT; do
-			if [[ $(echo "$UPDATE_OUTPUT") -gt 0 ]]; then
-				apt upgrade -y && apt dist-upgrade -Vy && apt autoremove -y && apt autoclean && apt clean;
-			fi
+			CMD_UPDATE="apt update 2>/dev/null | grep -ic 'package can be upgraded'";
 
-			echoGreen "All Packages are up to date......" && sleep 2 && break;
-		done
-	}
+			eval "$CMD_UPDATE" | {
+				while read -r UPDATE_OUTPUT; do
+					if [[ $UPDATE_OUTPUT -gt 0 ]]; then
+						apt upgrade -y && apt dist-upgrade -Vy && apt autoremove -y && apt autoclean && apt clean;
+					fi
+
+					echoGreen "All Packages are up to date......" && sleep 2 && break;
+				done
+			}
+			;;
+		[5]* )
+			echoRed "The Web Proxy Won't Let us Through......";
+			sleep 2;;
+		* )
+			echoOrange "The Network is Down or Very Slow......";
+			sleep 2;
+	esac
 }
 
 listCrackedAP(){
@@ -400,7 +381,7 @@ setAutoReaverOpt(){
         done
 }
 
-reaverConfig(){
+configuration(){
 	local REAVER_OUTPUT;
 }
 
@@ -940,4 +921,31 @@ if [[ ! -d "$REAVER_SESSION_DIR" ]]; then mkdir -p -m 700 "$REAVER_SESSION_DIR";
 # shellcheck disable=SC2174
 if [[ ! -d "$REAVER_CRACKED_DIR" ]]; then mkdir -p -m 700 "$REAVER_CRACKED_DIR"; fi;
 
-Menu;
+while true; do
+	COUNTMENU=0;
+
+	echoBlue "MENU";
+	echoWhite "--------------------------";
+
+	while read -r MENU_OUTPUT; do
+		COUNTMENU=$((COUNTMENU+1));
+		echoBlue "$COUNTMENU    $(awk '{ print $1 }' <<< "$MENU_OUTPUT" | sed 's/_/ /g')";
+	done < "$MENU_FILE"
+
+	echoWhite "--------------------------";
+
+	while true; do
+		# shellcheck disable=SC2162
+		read -p "Option: " MENUCHOICE;
+
+		if [[ $MENUCHOICE -le $COUNTMENU && $MENUCHOICE -ge 1 ]]; then
+			clear;
+			# shellcheck disable=SC2091
+			# Output is to be executed
+			$(sed -n "$((MENUCHOICE))p" "$MENU_FILE" | awk '{ print $2 }');
+			clear && break;
+		else
+			echoOrange "InValid Selection...";
+		fi
+	done
+done
