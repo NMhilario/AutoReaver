@@ -2,14 +2,14 @@ Update,UpdateDistro			NULL
 	-MENU_SEPARATOR-
 Check_Requisites,checkRequisites	NULL
 	-MENU_SEPARATOR-
-Cracked_AP_List,listCrackedAP		Connect_to_AP,
+Cracked_AP_List,listCrackedAP		Connect_to_AP,connectAP
 NULL					Back
 	-MENU_SEPARATOR-
 AutoReaver,autoReaver			NULL
 	-MENU_SEPARATOR-
-Configuration,configuration		MDK3,
-NULL					Autoreaver,
-NULL					Aireplay-NG,
+Configuration,configuration		MDK3,setMDK3Settings
+NULL					Autoreaver,setAutoreaverSettings
+NULL					Aireplay-NG,setAireplaySettings
 NULL					Back
 	-MENU_SEPARATOR-
 Exit,exitAutoReaver			NULL
